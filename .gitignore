@@ -1,0 +1,19 @@
+# SQLite database
+projectcrm.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+ENV/
+
+# Local configuration
+.env

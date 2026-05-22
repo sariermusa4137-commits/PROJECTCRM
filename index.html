@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROJECTCRM - Acente İş Birliği Paneli</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet.js CSS for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="./css/styles.css">
+    
+    <!-- Chart.js for location price trends -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+<body class="dark-theme">
+    
+    <!-- App Container -->
+    <div id="app-container">
+        
+        <!-- Sidebar Navigation (Hidden for non-logged-in users) -->
+        <aside id="sidebar" class="sidebar hidden">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    <div class="logo-text">
+                        <span class="logo-title">PROJECTCRM</span>
+                        <span class="logo-subtitle">Acente Paneli</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- User Status Card -->
+            <div id="user-status-card" class="user-status-card">
+                <img id="user-avatar" src="" alt="Profil" class="user-avatar">
+                <div class="user-info">
+                    <div id="user-name" class="user-name">Giriş Yapılmadı</div>
+                    <div id="agency-name-badge" class="agency-badge">Acente Yok</div>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li>
+                        <a href="#dashboard" class="nav-link active" data-view="dashboard">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#portfolio" class="nav-link" data-view="portfolio">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                            <span>Portföy</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#customers" class="nav-link" data-view="customers">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span>Müşteriler</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#meetings" class="nav-link" data-view="meetings">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            <span>Görüşme & Takvim</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#locations" class="nav-link" data-view="locations">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+                            <span>Bölge Analizleri</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#deals" class="nav-link" data-view="deals">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon" style="stroke: #ea580c;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            <span style="border-bottom: 1px dashed rgba(234, 88, 12, 0.2)">Süreç Yönetimi</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#social" class="nav-link" data-view="social">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                            <span>Sosyal Medya</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn-logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="nav-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <span>Çıkış Yap</span>
+                </button>
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <div id="main-content" class="main-content full-width">
+            
+            <!-- Top bar -->
+            <header id="topbar" class="topbar hidden">
+                <div class="breadcrumb">
+                    <span id="breadcrumb-parent">PROJECTCRM</span>
+                    <span class="breadcrumb-separator">/</span>
+                    <span id="breadcrumb-active" class="active">Dashboard</span>
+                </div>
+                <div class="topbar-actions">
+                    <div id="demo-mode-indicator" class="demo-indicator hidden">
+                        <span class="pulse-dot"></span>
+                        Demo Modu Aktif
+                    </div>
+                    <button id="btn-agency-settings" class="btn-icon" title="Acente Bilgileri">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-md"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span id="txt-agency-code" class="agency-code-text">Kod: -</span>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Dynamic Content View -->
+            <main id="app-view">
+                <!-- Loading State (Default) -->
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p>PROJECTCRM yükleniyor...</p>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Modal Containers (Generic and reusable) -->
+    <div id="modal-container" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-title">Modal Başlığı</h3>
+                <button id="modal-close" class="modal-close-btn">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body">
+                <!-- Dynamic Modal Content -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+    
+    <!-- Main Application Entry Module -->
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>
