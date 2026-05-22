@@ -1,4 +1,5 @@
 // PROJECTCRM - Bulut Veri Deposu (SQLite REST API Backend Entegrasyonu)
+import { showToast } from './components/ui.js';
 
 // App State
 export const state = {
@@ -26,31 +27,39 @@ let pollingInterval = null;
 export async function initStore() {
     state.isDemoMode = false;
     const userId = localStorage.getItem("projectcrm_user_id");
-    if (userId) {
-        try {
-            const res = await fetch(`/api/auth/status?userId=${userId}`);
-            if (res.ok) {
-                const data = await res.json();
-                state.currentUser = data.user;
-                state.agency = data.agency;
-                if (state.agency && state.agency.id) {
-                    await fetchAllData(state.agency.id);
-                    startPolling();
-                }
-            } else {
-                // Clear invalid/stale user session (e.g. database reset)
-                localStorage.removeItem("projectcrm_user_id");
+    const url = userId ? `/api/auth/status?userId=${userId}` : '/api/auth/status';
+    
+    try {
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            state.currentUser = data.user;
+            state.agency = data.agency;
+            
+            // Sync userId back to localStorage
+            if (data.user && data.user.uid) {
+                localStorage.setItem("projectcrm_user_id", data.user.uid);
             }
-        } catch (e) {
-            console.error("initStore error:", e);
+            
+            if (state.agency && state.agency.id) {
+                await fetchAllData(state.agency.id);
+                startPolling();
+            }
+        } else {
+            // Clear invalid/stale user session (e.g. database reset)
+            localStorage.removeItem("projectcrm_user_id");
+            state.currentUser = null;
+            state.agency = null;
         }
+    } catch (e) {
+        console.error("initStore error:", e);
     }
     notify();
 }
 
 // Fetch all data from backend for this agency
 export async function fetchAllData(agencyId) {
-    const res = await fetch(`/api/data?agencyId=${agencyId}`);
+    const res = await apiFetch(`/api/data?agencyId=${agencyId}`);
     if (!res.ok) {
         throw new Error("Veriler sunucudan alınamadı.");
     }
@@ -141,6 +150,11 @@ export async function loginWithLocalUser(email, displayName) {
 // Logout
 export async function logout() {
     stopPolling();
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+        console.error("Backend logout error:", e);
+    }
     localStorage.removeItem("projectcrm_user_id");
     state.currentUser = null;
     state.agency = null;
@@ -154,6 +168,18 @@ export async function logout() {
     notify();
 }
 
+// Wrapper for fetch that catches 401 Unauthorized status codes
+export async function apiFetch(url, options = {}) {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+        await logout();
+        window.location.hash = "#auth";
+        showToast("Oturumunuz sonlandırıldı. Lütfen tekrar giriş yapın.", "error");
+        throw new Error("Yetkisiz erişim. Oturum kapatıldı.");
+    }
+    return res;
+}
+
 // Update Current User
 export function updateCurrentUser(user) {
     state.currentUser = user;
@@ -164,7 +190,7 @@ export function updateCurrentUser(user) {
 // Create Agency
 export async function createAgency(agencyName) {
     if (!state.currentUser) throw new Error("Giriş yapılması gerekir.");
-    const res = await fetch('/api/agency/create', {
+    const res = await apiFetch('/api/agency/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: state.currentUser.uid, name: agencyName })
@@ -188,7 +214,7 @@ export async function createAgency(agencyName) {
 // Join Agency
 export async function joinAgency(agencyCode) {
     if (!state.currentUser) throw new Error("Giriş yapılması gerekir.");
-    const res = await fetch('/api/agency/join', {
+    const res = await apiFetch('/api/agency/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: state.currentUser.uid, agencyCode })
@@ -221,7 +247,7 @@ async function logActivity(actionText) {
     };
     
     try {
-        const res = await fetch('/api/data/activities', {
+        const res = await apiFetch('/api/data/activities', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(item)
@@ -292,7 +318,7 @@ export async function addRecord(collectionName, record) {
     // Sync fields for portfolios and customers
     record = syncFields(collectionName, record);
     
-    const res = await fetch(`/api/data/${collectionName}`, {
+    const res = await apiFetch(`/api/data/${collectionName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(record)
@@ -314,7 +340,7 @@ export async function addRecord(collectionName, record) {
 export async function updateRecord(collectionName, id, updatedFields) {
     updatedFields = syncFields(collectionName, updatedFields);
     
-    const res = await fetch(`/api/data/${collectionName}/${id}`, {
+    const res = await apiFetch(`/api/data/${collectionName}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedFields)
@@ -336,7 +362,7 @@ export async function deleteRecord(collectionName, id) {
     const record = state[collectionName].find(item => item.id === id);
     let title = record ? (record.title || record.name || record.task) : "kayıt";
     
-    const res = await fetch(`/api/data/${collectionName}/${id}`, {
+    const res = await apiFetch(`/api/data/${collectionName}/${id}`, {
         method: 'DELETE'
     });
     if (!res.ok) {

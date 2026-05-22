@@ -1,6 +1,6 @@
 // PROJECTCRM - User Profile Settings View Module
 
-import { state, updateCurrentUser } from '../store.js';
+import { state, updateCurrentUser, apiFetch } from '../store.js';
 import { showToast } from '../components/ui.js';
 
 export function renderProfileView(container) {
@@ -183,7 +183,7 @@ function setupProfileEventListeners(container, uid) {
                 saveBtn.disabled = true;
                 saveBtn.textContent = "Kaydediliyor...";
                 
-                const response = await fetch('/api/profile/update', {
+                const response = await apiFetch('/api/profile/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -242,7 +242,7 @@ function setupProfileEventListeners(container, uid) {
                 const email = container.querySelector('#p-email').value.trim();
                 const phone = container.querySelector('#p-phone').value.trim();
 
-                const response = await fetch('/api/profile/update', {
+                const response = await apiFetch('/api/profile/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -289,7 +289,7 @@ async function handleAvatarFile(file, uid, avatarPreviewElement) {
 
         showToast("Fotoğraf yükleniyor...", "info");
         
-        const response = await fetch('/api/profile/upload', {
+        const response = await apiFetch('/api/profile/upload', {
             method: 'POST',
             body: formData
         });

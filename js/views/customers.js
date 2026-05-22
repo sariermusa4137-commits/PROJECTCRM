@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Müşteri Yönetimi, Zaman Tüneli ve Eşleştirme Görünümü
 
-import { state, addRecord, updateRecord, deleteRecord, getMatchesForCustomer, canViewPhone, maskPhoneNumber } from '../store.js';
+import { state, addRecord, updateRecord, deleteRecord, getMatchesForCustomer, canViewPhone, maskPhoneNumber, apiFetch } from '../store.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
 let activeTab = 'all'; // all, buyer, seller
@@ -82,7 +82,7 @@ export function renderCustomersView(container) {
                     İndiriliyor...
                 `;
                 
-                const response = await fetch('/api/export', {
+                const response = await apiFetch('/api/export', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

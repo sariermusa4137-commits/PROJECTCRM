@@ -7,20 +7,54 @@ import uuid
 import datetime
 import random
 import string
-from flask import Flask, send_from_directory, request, send_file
+from flask import Flask, send_from_directory, request, send_file, session, redirect, url_for, jsonify
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from functools import wraps
+from datetime import timedelta
 
 # Ensure JS/CSS mimetypes are registered correctly for ES modules
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+app.secret_key = os.environ.get('SECRET_KEY', 'PROJECTCRM_SECURE_SECRET_2026_KEY')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('user_id'):
+            return {"error": "Yetkisiz erişim. Lütfen giriş yapın."}, 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
+
+@app.route('/login')
+def login_route():
+    if session.get('user_id'):
+        return redirect('/')
+    return redirect('/#auth')
+
+@app.route('/logout')
+def logout_route():
+    session.clear()
+    response = redirect('/login')
+    response.set_cookie(app.config.get('SESSION_COOKIE_NAME', 'session'), '', expires=0)
+    return response
+
+@app.route('/api/auth/logout', methods=['POST', 'GET'])
+def api_auth_logout():
+    session.clear()
+    response = jsonify({"success": True})
+    response.set_cookie(app.config.get('SESSION_COOKIE_NAME', 'session'), '', expires=0)
+    return response
 
 @app.route('/<path:path>')
 def serve_static(path):
@@ -32,6 +66,7 @@ def add_header(response):
     return response
 
 @app.route('/api/export', methods=['POST'])
+@login_required
 def export_excel():
     try:
         data = request.get_json() or {}
@@ -653,6 +688,11 @@ def auth_login():
                 agency_data = dict(agency)
                 
         conn.close()
+        
+        # Set session cookie
+        session['user_id'] = user_data['uid']
+        session.permanent = True
+        
         return {"user": user_data, "agency": agency_data}
     except Exception as e:
         return {"error": str(e)}, 500
@@ -660,9 +700,14 @@ def auth_login():
 @app.route('/api/auth/status', methods=['GET'])
 def auth_status():
     try:
-        user_id = request.args.get('userId')
+        user_id = session.get('user_id')
         if not user_id:
-            return {"error": "userId parametresi gereklidir."}, 400
+            user_id = request.args.get('userId')
+            if not user_id:
+                return {"error": "Oturum bulunamadı. Lütfen giriş yapın."}, 401
+            # Auto-restore session from valid localStorage identifier
+            session['user_id'] = user_id
+            session.permanent = True
             
         conn = get_db()
         cursor = conn.cursor()
@@ -672,6 +717,8 @@ def auth_status():
         
         if not user:
             conn.close()
+            # Clear invalid session
+            session.clear()
             return {"error": "Kullanıcı bulunamadı."}, 404
             
         user_data = dict(user)
@@ -688,6 +735,7 @@ def auth_status():
         return {"error": str(e)}, 500
 
 @app.route('/api/agency/create', methods=['POST'])
+@login_required
 def agency_create():
     try:
         data = request.get_json() or {}
@@ -726,6 +774,7 @@ def agency_create():
         return {"error": str(e)}, 500
 
 @app.route('/api/agency/join', methods=['POST'])
+@login_required
 def agency_join():
     try:
         data = request.get_json() or {}
@@ -761,6 +810,7 @@ def agency_join():
         return {"error": str(e)}, 500
 
 @app.route('/api/data', methods=['GET'])
+@login_required
 def get_all_data():
     try:
         agency_id = request.args.get('agencyId')
@@ -853,6 +903,7 @@ def get_all_data():
         return {"error": str(e)}, 500
 
 @app.route('/api/data/<collection>', methods=['POST'])
+@login_required
 def create_data_record(collection):
     try:
         data = request.get_json() or {}
@@ -917,6 +968,7 @@ def create_data_record(collection):
         return {"error": str(e)}, 500
 
 @app.route('/api/data/<collection>/<id>', methods=['PUT'])
+@login_required
 def update_data_record(collection, id):
     try:
         data = request.get_json() or {}
@@ -977,6 +1029,7 @@ def update_data_record(collection, id):
         return {"error": str(e)}, 500
 
 @app.route('/api/data/<collection>/<id>', methods=['DELETE'])
+@login_required
 def delete_data_record(collection, id):
     try:
         allowed_collections = ['portfolios', 'customers', 'meetings', 'todos', 'activities', 'deals']
@@ -995,6 +1048,7 @@ def delete_data_record(collection, id):
         return {"error": str(e)}, 500
 
 @app.route('/api/profile/update', methods=['POST'])
+@login_required
 def profile_update():
     try:
         data = request.get_json() or {}
@@ -1046,6 +1100,7 @@ def profile_update():
         return {"error": str(e)}, 500
 
 @app.route('/api/profile/upload', methods=['POST'])
+@login_required
 def profile_upload():
     try:
         if 'file' not in request.files:

@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Portföy Yönetimi ve Harita Görünümü
 
-import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, canViewPhone, maskPhoneNumber } from '../store.js';
+import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, canViewPhone, maskPhoneNumber, apiFetch } from '../store.js';
 import { initMap, renderPortfolioMarkers, enableLocationSelection, setSelectMarkerPosition } from '../components/map.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
@@ -111,7 +111,7 @@ export function renderPortfolioView(container) {
                     İndiriliyor...
                 `;
                 
-                const response = await fetch('/api/export', {
+                const response = await apiFetch('/api/export', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
