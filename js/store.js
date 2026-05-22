@@ -472,30 +472,9 @@ export async function summarizeNewsWithAI(content) {
 }
 
 export async function triggerNewsScraper(regionName) {
-    const templates = generateNewsTemplates(regionName);
-    const processedNews = [];
-    
-    for (const item of templates) {
-        let summary = "";
-        try {
-            summary = await summarizeNewsWithAI(item.content);
-        } catch (e) {
-            summary = item.fallbackSummary;
-        }
-        processedNews.push({
-            id: Math.random().toString(36).substring(2, 9),
-            title: item.title,
-            content: item.content,
-            summary: summary,
-            source: item.source,
-            date: new Date(Date.now() - Math.random() * 3 * 3600000).toISOString(),
-            region: item.region
-        });
-    }
-    
-    state.regionNews = processedNews;
+    state.regionNews = [];
     notify();
-    return processedNews;
+    return [];
 }
 
 // ----------------- MATCHING ALGORITHMS -----------------

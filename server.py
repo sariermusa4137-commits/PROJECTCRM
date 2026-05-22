@@ -26,6 +26,11 @@ def index():
 def serve_static(path):
     return send_from_directory('.', path)
 
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return response
+
 @app.route('/api/export', methods=['POST'])
 def export_excel():
     try:
