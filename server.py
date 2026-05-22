@@ -562,6 +562,10 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Initialize database on app startup (runs under Gunicorn and development server)
+with app.app_context():
+    init_db()
+
 # API Routes
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
