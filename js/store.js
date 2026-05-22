@@ -154,6 +154,13 @@ export async function logout() {
     notify();
 }
 
+// Update Current User
+export function updateCurrentUser(user) {
+    state.currentUser = user;
+    notify();
+}
+
+
 // Create Agency
 export async function createAgency(agencyName) {
     if (!state.currentUser) throw new Error("Giriş yapılması gerekir.");

@@ -309,7 +309,12 @@ def init_db():
             email TEXT UNIQUE,
             photoURL TEXT,
             agencyId TEXT,
-            createdAt TEXT
+            createdAt TEXT,
+            firstName TEXT,
+            lastName TEXT,
+            phone TEXT,
+            password TEXT,
+            profile_image TEXT
         )
     ''')
     
@@ -367,6 +372,7 @@ def init_db():
             phone TEXT,
             email TEXT,
             birthDate TEXT,
+            birth_date TEXT,
             type TEXT,
             budget REAL,
             searchLocation TEXT,
@@ -383,6 +389,40 @@ def init_db():
             tapu_durumu_notlari TEXT
         )
     ''')
+    
+    # Alter tables to add new columns if they do not exist
+    alter_queries = [
+        ("users", "firstName", "TEXT"),
+        ("users", "lastName", "TEXT"),
+        ("users", "phone", "TEXT"),
+        ("users", "password", "TEXT"),
+        ("users", "profile_image", "TEXT"),
+        ("customers", "birth_date", "TEXT")
+    ]
+    for table, col, col_type in alter_queries:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+        except sqlite3.OperationalError:
+            pass # column already exists
+            
+    # Initialize firstName and lastName for existing users if empty
+    try:
+        cursor.execute("SELECT uid, displayName, firstName, lastName FROM users")
+        users_rows = cursor.fetchall()
+        for u in users_rows:
+            uid = u["uid"]
+            disp = u["displayName"] or ""
+            fname = u["firstName"]
+            lname = u["lastName"]
+            if (fname is None or fname == "") and disp:
+                parts = disp.split(" ", 1)
+                f = parts[0]
+                l = parts[1] if len(parts) > 1 else ""
+                cursor.execute("UPDATE users SET firstName = ?, lastName = ? WHERE uid = ?", (f, l, uid))
+    except Exception as ex:
+        print("Error migrating display names:", ex)
+        
+    conn.commit()
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS meetings (
@@ -593,10 +633,13 @@ def auth_login():
         else:
             uid = str(uuid.uuid4())
             created_at = datetime.datetime.now().isoformat()
+            names = display_name.split(' ', 1)
+            first_name = names[0]
+            last_name = names[1] if len(names) > 1 else ""
             cursor.execute('''
-                INSERT INTO users (uid, displayName, email, photoURL, agencyId, createdAt)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (uid, display_name, email, "", "", created_at))
+                INSERT INTO users (uid, displayName, email, photoURL, agencyId, createdAt, firstName, lastName, phone, password, profile_image)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (uid, display_name, email, "", "", created_at, first_name, last_name, "", "", ""))
             conn.commit()
             
             cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
@@ -744,6 +787,48 @@ def get_all_data():
                     except:
                         item['checklist'] = []
                 list_data.append(item)
+                
+            if table == 'meetings':
+                try:
+                    cursor.execute('SELECT id, name, birthDate, birth_date FROM customers WHERE agencyId = ?', (agency_id,))
+                    customers_rows = cursor.fetchall()
+                    today_year = datetime.date.today().year
+                    for c_row in customers_rows:
+                        c_id = c_row['id']
+                        c_name = c_row['name']
+                        b_str = c_row['birth_date'] or c_row['birthDate']
+                        if b_str:
+                            parts = b_str.split('-')
+                            if len(parts) >= 2:
+                                try:
+                                    if len(parts) == 3:
+                                        m_val = int(parts[1])
+                                        d_val = int(parts[2])
+                                    else:
+                                        m_val = int(parts[0])
+                                        d_val = int(parts[1])
+                                    
+                                    for yr in [today_year - 1, today_year, today_year + 1]:
+                                        list_data.append({
+                                            "id": f"birthday-{c_id}-{yr}",
+                                            "agencyId": agency_id,
+                                            "createdById": "system",
+                                            "createdByName": "Sistem",
+                                            "createdAt": "",
+                                            "customerId": c_id,
+                                            "customerName": c_name,
+                                            "title": f"🎂 Doğum Günü: {c_name}",
+                                            "type": "Doğum Günü",
+                                            "date": f"{yr}-{m_val:02d}-{d_val:02d}",
+                                            "time": "09:00",
+                                            "notes": f"{c_name} Doğum Günü",
+                                            "kanbanStage": ""
+                                        })
+                                except (ValueError, IndexError):
+                                    pass
+                except Exception as ex:
+                    print("Error injecting birthdays:", ex)
+                    
             response_data[table] = list_data
             
         cursor.execute('SELECT * FROM locations')
@@ -771,6 +856,12 @@ def get_all_data():
 def create_data_record(collection):
     try:
         data = request.get_json() or {}
+        
+        if collection == 'customers':
+            if 'birthDate' in data and 'birth_date' not in data:
+                data['birth_date'] = data['birthDate']
+            elif 'birth_date' in data and 'birthDate' not in data:
+                data['birthDate'] = data['birth_date']
         
         allowed_collections = ['portfolios', 'customers', 'meetings', 'todos', 'activities', 'deals']
         if collection not in allowed_collections:
@@ -829,6 +920,12 @@ def create_data_record(collection):
 def update_data_record(collection, id):
     try:
         data = request.get_json() or {}
+        
+        if collection == 'customers':
+            if 'birthDate' in data and 'birth_date' not in data:
+                data['birth_date'] = data['birthDate']
+            elif 'birth_date' in data and 'birthDate' not in data:
+                data['birthDate'] = data['birth_date']
         
         allowed_collections = ['portfolios', 'customers', 'meetings', 'todos', 'activities', 'deals']
         if collection not in allowed_collections:
@@ -894,6 +991,98 @@ def delete_data_record(collection, id):
         
         conn.close()
         return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/profile/update', methods=['POST'])
+def profile_update():
+    try:
+        data = request.get_json() or {}
+        uid = data.get('uid')
+        first_name = data.get('firstName', '').strip()
+        last_name = data.get('lastName', '').strip()
+        phone = data.get('phone', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        
+        if not uid or not first_name or not email:
+            return {"error": "Kullanıcı ID, Ad ve E-posta alanları zorunludur."}, 400
+            
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Check email uniqueness
+        cursor.execute('SELECT uid FROM users WHERE email = ? AND uid != ?', (email, uid))
+        if cursor.fetchone():
+            conn.close()
+            return {"error": "Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır."}, 400
+            
+        display_name = f"{first_name} {last_name}".strip()
+        
+        query = '''
+            UPDATE users 
+            SET firstName = ?, lastName = ?, displayName = ?, phone = ?, email = ?
+        '''
+        params = [first_name, last_name, display_name, phone, email]
+        
+        if password:
+            query += ", password = ?"
+            params.append(password)
+            
+        query += " WHERE uid = ?"
+        params.append(uid)
+        
+        cursor.execute(query, params)
+        conn.commit()
+        
+        # Get updated user data
+        cursor.execute('SELECT * FROM users WHERE uid = ?', (uid,))
+        user_row = cursor.fetchone()
+        user_data = dict(user_row)
+        conn.close()
+        
+        return {"success": True, "user": user_data}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/profile/upload', methods=['POST'])
+def profile_upload():
+    try:
+        if 'file' not in request.files:
+            return {"error": "Yüklenecek dosya bulunamadı."}, 400
+            
+        file = request.files['file']
+        uid = request.form.get('uid')
+        
+        if not uid:
+            return {"error": "Kullanıcı ID gereklidir."}, 400
+            
+        if file.filename == '':
+            return {"error": "Dosya seçilmedi."}, 400
+            
+        if file:
+            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+            filename = file.filename
+            ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+            if ext not in allowed_extensions:
+                return {"error": "Sadece resim dosyaları (.png, .jpg, .jpeg, .gif, .webp) yüklenebilir."}, 400
+                
+            upload_folder = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'profiles')
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            unique_filename = f"{uid}_{uuid.uuid4().hex[:8]}.{ext}"
+            file_path = os.path.join(upload_folder, unique_filename)
+            file.save(file_path)
+            
+            relative_url = f"/static/uploads/profiles/{unique_filename}"
+            
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET profile_image = ?, photoURL = ? WHERE uid = ?', (relative_url, relative_url, uid))
+            conn.commit()
+            conn.close()
+            
+            return {"success": True, "profile_image": relative_url}
     except Exception as e:
         return {"error": str(e)}, 500
 

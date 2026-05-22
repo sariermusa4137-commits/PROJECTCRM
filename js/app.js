@@ -9,6 +9,7 @@ import { renderMeetingsView } from './views/meetings.js';
 import { renderLocationsView } from './views/locations.js';
 import { renderSocialView } from './views/social.js';
 import { renderDealsView } from './views/deals.js';
+import { renderProfileView } from './views/profile.js';
 import { showToast, openModal, closeModal } from './components/ui.js';
 
 // DOM Elements
@@ -112,6 +113,14 @@ function setupGlobalEvents() {
             });
         });
     }
+
+    // User Status Card - Click to view profile
+    const userStatusCard = document.getElementById('user-status-card');
+    if (userStatusCard) {
+        userStatusCard.addEventListener('click', () => {
+            window.location.hash = "#profile";
+        });
+    }
 }
 
 // Router - Renders views based on location hash
@@ -155,7 +164,8 @@ function handleRouting() {
             meetings: "Görüşmeler & Süreçler",
             locations: "Bölge Analizleri",
             social: "Sosyal Medya",
-            deals: "Süreç Yönetimi"
+            deals: "Süreç Yönetimi",
+            profile: "Profilim"
         };
         breadcrumbActive.textContent = viewTitles[viewName] || viewName.toUpperCase();
     }
@@ -206,6 +216,9 @@ function renderActiveView(viewName) {
             break;
         case "deals":
             renderDealsView(appView);
+            break;
+        case "profile":
+            renderProfileView(appView);
             break;
         default:
             appView.innerHTML = `<div style="padding:40px; text-align:center;"><h2>Görünüm bulunamadı (404)</h2></div>`;

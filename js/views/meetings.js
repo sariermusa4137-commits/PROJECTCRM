@@ -201,11 +201,16 @@ function renderCalendar() {
         dayCell.innerHTML = `
             <span class="calendar-day-num">${day}</span>
             <div class="calendar-day-events">
-                ${dayMeetings.map(m => `
-                    <span class="calendar-event-pill ${m.type.toLowerCase().replace(/\s+/g, '-').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ı/g,'i').replace(/ğ/g,'g')}" data-id="${m.id}" title="${m.time} - ${m.customerName}">
-                        ${m.time} ${m.customerName}
-                    </span>
-                `).join('')}
+                ${dayMeetings.map(m => {
+                    const isBirthday = m.type === 'Doğum Günü';
+                    const displayText = isBirthday ? `🎂 Doğum Günü: ${m.customerName}` : `${m.time} ${m.customerName}`;
+                    const cleanClass = m.type.toLowerCase().replace(/\s+/g, '-').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ı/g,'i').replace(/ğ/g,'g');
+                    return `
+                        <span class="calendar-event-pill ${cleanClass}" data-id="${m.id}" title="${displayText}">
+                            ${displayText}
+                        </span>
+                    `;
+                }).join('')}
             </div>
         `;
         
@@ -246,6 +251,7 @@ function renderCalendar() {
 
 // ----------------- MODAL DETAILS & CRUD -----------------
 function openMeetingDetailModal(m) {
+    const isBirthday = m.type === 'Doğum Günü';
     const content = `
         <div style="display:flex; flex-direction:column; gap:16px;">
             <div class="specs-grid">
@@ -254,17 +260,19 @@ function openMeetingDetailModal(m) {
                     <span class="spec-entry-value">${m.customerName}</span>
                 </div>
                 <div class="spec-entry">
-                    <span class="spec-entry-label">Görüşme Türü</span>
+                    <span class="spec-entry-label">Etkinlik Türü</span>
                     <span class="spec-entry-value">${m.type}</span>
                 </div>
                 <div class="spec-entry">
                     <span class="spec-entry-label">Tarih - Saat</span>
                     <span class="spec-entry-value">${m.date} - ${m.time}</span>
                 </div>
+                ${isBirthday ? '' : `
                 <div class="spec-entry">
                     <span class="spec-entry-label">Süreç Aşaması</span>
                     <span class="spec-entry-value">${m.kanbanStage}</span>
                 </div>
+                `}
             </div>
             
             <div>
@@ -272,35 +280,39 @@ function openMeetingDetailModal(m) {
                 <p style="font-size:13px; color:var(--text-secondary); line-height:1.6; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:var(--border-radius-md);">${m.notes || "Not eklenmemiş."}</p>
             </div>
             
+            ${isBirthday ? '' : `
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
                 <button id="btn-edit-m" class="btn btn-outline">Düzenle</button>
                 <button id="btn-delete-m" class="btn btn-danger">Randevuyu İptal Et</button>
             </div>
+            `}
         </div>
     `;
     
     openModal(m.title, content);
     
-    // Edit Click
-    document.getElementById('btn-edit-m').addEventListener('click', () => {
-        closeModal();
-        openEditMeetingModal(m);
-    });
-    
-    // Delete/Cancel click
-    document.getElementById('btn-delete-m').addEventListener('click', async () => {
-        if (confirm("Bu randevu/aktivite kaydını silmek istediğinize emin misiniz?")) {
-            try {
-                await deleteRecord('meetings', m.id);
-                closeModal();
-                showToast("Aktivite silindi.", "success");
-                renderKanbanBoard();
-                renderCalendar();
-            } catch (err) {
-                showToast("Aktivite silinirken hata: " + err.message, "error");
+    if (!isBirthday) {
+        // Edit Click
+        document.getElementById('btn-edit-m').addEventListener('click', () => {
+            closeModal();
+            openEditMeetingModal(m);
+        });
+        
+        // Delete/Cancel click
+        document.getElementById('btn-delete-m').addEventListener('click', async () => {
+            if (confirm("Bu randevu/aktivite kaydını silmek istediğinize emin misiniz?")) {
+                try {
+                    await deleteRecord('meetings', m.id);
+                    closeModal();
+                    showToast("Aktivite silindi.", "success");
+                    renderKanbanBoard();
+                    renderCalendar();
+                } catch (err) {
+                    showToast("Aktivite silinirken hata: " + err.message, "error");
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 function openAddMeetingModal(defaultDate = '') {

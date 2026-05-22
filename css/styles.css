@@ -155,6 +155,14 @@ h1, h2, h3, h4, h5, h6 {
     display: flex;
     align-items: center;
     gap: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.user-status-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
 .user-avatar {
@@ -2102,3 +2110,202 @@ textarea {
 .leaflet-bar a:hover {
     background-color: #1e293b !important;
 }
+
+/* Calendar Birthday Event Pill */
+.calendar-event-pill.dogum-gunu {
+    background: rgba(244, 143, 177, 0.15) !important;
+    color: #f472b6 !important;
+    border-left: 2px solid #f472b6;
+}
+
+/* Profile Page Layout */
+.profile-container {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+    animation: fadeIn var(--transition-normal) ease-in-out;
+}
+
+.profile-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .profile-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.profile-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-md);
+    padding: 24px;
+    overflow: hidden;
+}
+
+.avatar-card {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.avatar-upload-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.avatar-preview-wrapper {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    border: 3px solid var(--primary);
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    transition: all var(--transition-normal) ease;
+}
+
+.avatar-preview-wrapper:hover {
+    transform: scale(1.03);
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.5);
+}
+
+.avatar-preview-wrapper.dragover {
+    border-color: var(--secondary);
+    transform: scale(1.05);
+}
+
+.profile-avatar-large {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-hover-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.75);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity var(--transition-fast) ease;
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.avatar-preview-wrapper:hover .avatar-hover-overlay {
+    opacity: 1;
+}
+
+.upload-tip {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.profile-summary h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+}
+
+.role-badge {
+    display: inline-block;
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.agency-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.profile-form-area {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.card-header-simple {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+}
+
+.card-icon-wrapper {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-icon-wrapper.secondary {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--secondary);
+}
+
+.card-header-simple h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-row-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 600px) {
+    .form-row-two {
+        grid-template-columns: 1fr;
+    }
+}
+
+.form-actions-profile {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
