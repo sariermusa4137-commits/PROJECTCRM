@@ -20,7 +20,7 @@ mimetypes.add_type('text/css', '.css')
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'PROJECTCRM_SECURE_SECRET_2026_KEY')
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
@@ -326,7 +326,11 @@ def export_excel():
         traceback.print_exc()
         return {"error": str(e)}, 500
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'projectcrm.db')
+DATABASE_PATH = os.environ.get('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'projectcrm.db'))
+# Ensure the parent directory of the database file exists
+db_dir = os.path.dirname(DATABASE_PATH)
+if db_dir and not os.path.exists(db_dir):
+    os.makedirs(db_dir, exist_ok=True)
 
 def get_db():
     conn = sqlite3.connect(DATABASE_PATH)
@@ -667,7 +671,7 @@ def login_or_register_oauth_user(email, name, picture):
         cursor.execute('SELECT * FROM users WHERE uid = ?', (user_data['uid'],))
         user_data = dict(cursor.fetchone())
     else:
-        uid = str(uuid.uuid4())
+        uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, email))
         created_at = datetime.datetime.now().isoformat()
         names = name.split(' ', 1)
         first_name = names[0]
@@ -744,7 +748,7 @@ def auth_login():
         if user:
             user_data = dict(user)
         else:
-            uid = str(uuid.uuid4())
+            uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, email))
             created_at = datetime.datetime.now().isoformat()
             names = display_name.split(' ', 1)
             first_name = names[0]
