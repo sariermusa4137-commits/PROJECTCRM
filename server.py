@@ -25,6 +25,16 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
+# Configure Upload Folders
+try:
+    os.makedirs('/data/uploads/profiles', exist_ok=True)
+    UPLOAD_BASE_DIR = '/data/uploads'
+except (PermissionError, OSError):
+    UPLOAD_BASE_DIR = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
+    os.makedirs(os.path.join(UPLOAD_BASE_DIR, 'profiles'), exist_ok=True)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_BASE_DIR
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -56,6 +66,10 @@ def api_auth_logout():
     response = jsonify({"success": True})
     response.set_cookie(app.config.get('SESSION_COOKIE_NAME', 'session'), '', expires=0)
     return response
+
+@app.route('/uploads/<path:filename>')
+def serve_uploads(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/<path:path>')
 def serve_static(path):
@@ -653,6 +667,26 @@ def init_db():
     except Exception as e:
         print(f"Error promoting admin: {e}", flush=True)
         
+    # Create and populate permissions table
+    try:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS permissions (
+                role TEXT PRIMARY KEY,
+                can_delete_portfolio INTEGER DEFAULT 1,
+                can_edit_customer INTEGER DEFAULT 1,
+                can_view_all_agency INTEGER DEFAULT 1
+            )
+        ''')
+        cursor.execute("SELECT COUNT(*) FROM permissions WHERE role = 'admin'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO permissions (role, can_delete_portfolio, can_edit_customer, can_view_all_agency) VALUES ('admin', 1, 1, 1)")
+        cursor.execute("SELECT COUNT(*) FROM permissions WHERE role = 'agent'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO permissions (role, can_delete_portfolio, can_edit_customer, can_view_all_agency) VALUES ('agent', 1, 1, 1)")
+        conn.commit()
+    except Exception as e:
+        print(f"Error initializing permissions table: {e}", flush=True)
+        
     conn.close()
 
 # Initialize database on app startup (runs under Gunicorn and development server)
@@ -949,11 +983,35 @@ def get_all_data():
         conn = get_db()
         cursor = conn.cursor()
         
+        # Get permissions
+        current_user_id = session.get('user_id')
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+        user_row = cursor.fetchone()
+        role = user_row['role'] if user_row else 'agent'
+        if not role:
+            role = 'agent'
+            
+        cursor.execute('SELECT can_view_all_agency FROM permissions WHERE role = ?', (role,))
+        perm_row = cursor.fetchone()
+        can_view_all_agency = perm_row['can_view_all_agency'] if perm_row else 1
+        
         tables = ['portfolios', 'customers', 'meetings', 'todos', 'activities', 'deals']
         response_data = {}
         
         for table in tables:
-            cursor.execute(f'SELECT * FROM {table} WHERE agencyId = ? ORDER BY rowid DESC', (agency_id,))
+            query = f'SELECT * FROM {table} WHERE agencyId = ?'
+            params = [agency_id]
+            
+            if not can_view_all_agency:
+                if table in ['portfolios', 'customers', 'meetings', 'deals']:
+                    query += ' AND createdById = ?'
+                    params.append(current_user_id)
+                elif table == 'todos':
+                    query += ' AND assignedToId = ?'
+                    params.append(current_user_id)
+            
+            query += ' ORDER BY rowid DESC'
+            cursor.execute(query, params)
             rows = cursor.fetchall()
             list_data = []
             for r in rows:
@@ -969,7 +1027,12 @@ def get_all_data():
                 
             if table == 'meetings':
                 try:
-                    cursor.execute('SELECT id, name, birthDate, birth_date FROM customers WHERE agencyId = ?', (agency_id,))
+                    cust_query = 'SELECT id, name, birthDate, birth_date FROM customers WHERE agencyId = ?'
+                    cust_params = [agency_id]
+                    if not can_view_all_agency:
+                        cust_query += ' AND createdById = ?'
+                        cust_params.append(current_user_id)
+                    cursor.execute(cust_query, cust_params)
                     customers_rows = cursor.fetchall()
                     today_year = datetime.date.today().year
                     for c_row in customers_rows:
@@ -1115,6 +1178,22 @@ def update_data_record(collection, id):
         conn = get_db()
         cursor = conn.cursor()
         
+        # Verify permissions
+        current_user_id = session.get('user_id')
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+        user_row = cursor.fetchone()
+        role = user_row['role'] if user_row else 'agent'
+        if not role:
+            role = 'agent'
+            
+        if collection == 'customers':
+            cursor.execute('SELECT can_edit_customer FROM permissions WHERE role = ?', (role,))
+            perm_row = cursor.fetchone()
+            can_edit_customer = perm_row['can_edit_customer'] if perm_row else 1
+            if not can_edit_customer:
+                conn.close()
+                return {"error": "Müşteri düzenleme yetkiniz bulunmamaktadır."}, 403
+        
         cursor.execute(f'PRAGMA table_info({collection})')
         columns = [col[1] for col in cursor.fetchall()]
         
@@ -1167,6 +1246,22 @@ def delete_data_record(collection, id):
             
         conn = get_db()
         cursor = conn.cursor()
+        
+        # Verify permissions
+        current_user_id = session.get('user_id')
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+        user_row = cursor.fetchone()
+        role = user_row['role'] if user_row else 'agent'
+        if not role:
+            role = 'agent'
+            
+        if collection == 'portfolios':
+            cursor.execute('SELECT can_delete_portfolio FROM permissions WHERE role = ?', (role,))
+            perm_row = cursor.fetchone()
+            can_delete_portfolio = perm_row['can_delete_portfolio'] if perm_row else 1
+            if not can_delete_portfolio:
+                conn.close()
+                return {"error": "Portföy silme yetkiniz bulunmamaktadır."}, 403
         
         cursor.execute(f"DELETE FROM {collection} WHERE id = ?", (id,))
         conn.commit()
@@ -1251,14 +1346,14 @@ def profile_upload():
             if ext not in allowed_extensions:
                 return {"error": "Sadece resim dosyaları (.png, .jpg, .jpeg, .gif, .webp) yüklenebilir."}, 400
                 
-            upload_folder = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'profiles')
+            upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'profiles')
             os.makedirs(upload_folder, exist_ok=True)
             
             unique_filename = f"{uid}_{uuid.uuid4().hex[:8]}.{ext}"
             file_path = os.path.join(upload_folder, unique_filename)
             file.save(file_path)
             
-            relative_url = f"/static/uploads/profiles/{unique_filename}"
+            relative_url = f"/uploads/profiles/{unique_filename}"
             
             conn = get_db()
             cursor = conn.cursor()
@@ -1335,6 +1430,103 @@ def update_user_role():
         conn.commit()
         conn.close()
         
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/users/delete', methods=['POST'])
+@login_required
+def delete_user():
+    try:
+        current_user_id = session.get('user_id')
+        data = request.get_json() or {}
+        target_user_id = data.get('userId')
+        
+        if not target_user_id:
+            return {"error": "userId alanı zorunludur."}, 400
+            
+        if current_user_id == target_user_id:
+            return {"error": "Yöneticinin kendi kendini silmesi engellenmiştir."}, 400
+            
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verify if current user is admin
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+        current_user = cursor.fetchone()
+        if not current_user or current_user['role'] != 'admin':
+            conn.close()
+            return {"error": "Yetkisiz işlem. Yalnızca yöneticiler kullanıcı silebilir."}, 403
+            
+        # Delete user
+        cursor.execute('DELETE FROM users WHERE uid = ?', (target_user_id,))
+        conn.commit()
+        conn.close()
+        
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/users/permissions', methods=['GET'])
+@login_required
+def get_role_permissions():
+    try:
+        current_user_id = session.get('user_id')
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verify if current user is admin
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+        current_user = cursor.fetchone()
+        if not current_user or current_user['role'] != 'admin':
+            conn.close()
+            return {"error": "Yetkisiz işlem. Yalnızca yöneticiler yetki ayarlarına erişebilir."}, 403
+            
+        cursor.execute('SELECT * FROM permissions')
+        rows = cursor.fetchall()
+        conn.close()
+        
+        permissions_dict = {}
+        for row in rows:
+            permissions_dict[row['role']] = {
+                "can_delete_portfolio": bool(row['can_delete_portfolio']),
+                "can_edit_customer": bool(row['can_edit_customer']),
+                "can_view_all_agency": bool(row['can_view_all_agency'])
+            }
+        return jsonify(permissions_dict)
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/users/update-permissions', methods=['POST'])
+@login_required
+def update_role_permissions():
+    try:
+        current_user_id = session.get('user_id')
+        data = request.get_json() or {}
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verify if current user is admin
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+        current_user = cursor.fetchone()
+        if not current_user or current_user['role'] != 'admin':
+            conn.close()
+            return {"error": "Yetkisiz işlem. Yalnızca yöneticiler yetki değiştirebilir."}, 403
+            
+        for role in ['admin', 'agent']:
+            role_data = data.get(role, {})
+            can_delete_portfolio = 1 if role_data.get('can_delete_portfolio') else 0
+            can_edit_customer = 1 if role_data.get('can_edit_customer') else 0
+            can_view_all_agency = 1 if role_data.get('can_view_all_agency') else 0
+            
+            cursor.execute('''
+                INSERT OR REPLACE INTO permissions (role, can_delete_portfolio, can_edit_customer, can_view_all_agency)
+                VALUES (?, ?, ?, ?)
+            ''', (role, can_delete_portfolio, can_edit_customer, can_view_all_agency))
+            
+        conn.commit()
+        conn.close()
         return {"success": True}
     except Exception as e:
         return {"error": str(e)}, 500
