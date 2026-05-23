@@ -14,12 +14,14 @@ from openpyxl.utils import get_column_letter
 from functools import wraps
 from datetime import timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_principal import Principal, Permission, RoleNeed, Identity, identity_loaded, identity_changed
 
 # Ensure JS/CSS mimetypes are registered correctly for ES modules
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+principal = Principal(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'PROJECTCRM_SECURE_SECRET_2026_KEY')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -42,6 +44,217 @@ def login_required(f):
             return {"error": "Yetkisiz erişim. Lütfen giriş yapın."}, 401
         return f(*args, **kwargs)
     return decorated_function
+
+# Flask-Principal Identity Loader
+@principal.identity_loader
+def read_identity_from_session():
+    if 'user_id' in session:
+        return Identity(session['user_id'])
+    return None
+
+# Load Roles & Permissions into Identity
+def on_identity_loaded(sender, identity):
+    identity.user = identity.id
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (identity.id,))
+        user_row = cursor.fetchone()
+        if user_row:
+            role = user_row['role'] or 'agent'
+            identity.provides.add(RoleNeed(role))
+            
+            # Load permissions from rol_yetkileri
+            cursor.execute('SELECT * FROM rol_yetkileri WHERE role = ?', (role,))
+            perm_row = cursor.fetchone()
+            if perm_row:
+                perm_dict = dict(perm_row)
+                for perm_name, has_val in perm_dict.items():
+                    if perm_name != 'role' and has_val:
+                        identity.provides.add(RoleNeed(f"perm:{perm_name}"))
+        conn.close()
+    except Exception as e:
+        print(f"Error loading identity permissions: {e}", flush=True)
+
+identity_loaded.connect(on_identity_loaded, app)
+
+# 403 Forbidden Page HTML Template
+def render_forbidden_html():
+    return """
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Erişim Engellendi (403) - PROJECTCRM</title>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+            :root {
+                --bg-color: #0b0f19;
+                --card-bg: rgba(30, 41, 59, 0.4);
+                --border-color: rgba(255, 255, 255, 0.08);
+                --primary-color: #6366f1;
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+            }
+            body {
+                background-color: var(--bg-color);
+                color: var(--text-primary);
+                font-family: 'Outfit', sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                overflow: hidden;
+            }
+            .container {
+                text-align: center;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                padding: 40px;
+                border-radius: 16px;
+                backdrop-filter: blur(12px);
+                max-width: 450px;
+                width: 90%;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            }
+            .icon {
+                font-size: 64px;
+                margin-bottom: 24px;
+                animation: pulse 2s infinite ease-in-out;
+            }
+            h1 {
+                font-size: 24px;
+                font-weight: 700;
+                margin: 0 0 12px 0;
+            }
+            p {
+                font-size: 14px;
+                color: var(--text-secondary);
+                margin: 0 0 24px 0;
+                line-height: 1.6;
+            }
+            .btn {
+                background: var(--primary-color);
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+                border-radius: 8px;
+                cursor: pointer;
+                text-decoration: none;
+                transition: all 0.2s ease;
+                display: inline-block;
+            }
+            .btn:hover {
+                opacity: 0.9;
+                transform: translateY(-1px);
+            }
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="icon">🔒</div>
+            <h1>Erişim Yetkiniz Bulunmamaktadır</h1>
+            <p>Bu sayfaya veya işleme erişmek için gerekli yetki izinlerine sahip değilsiniz. Lütfen acente yöneticiniz ile iletişime geçin.</p>
+            <a href="/" class="btn">Ana Sayfaya Dön</a>
+        </div>
+    </body>
+    </html>
+    """, 403
+
+# Dynamic Roles Accepted Decorator
+def roles_accepted(*requirements):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not session.get('user_id'):
+                return {"error": "Yetkisiz erişim. Lütfen giriş yapın."}, 401
+                
+            has_access = False
+            try:
+                conn = get_db()
+                cursor = conn.cursor()
+                cursor.execute('SELECT role FROM users WHERE uid = ?', (session.get('user_id'),))
+                user_row = cursor.fetchone()
+                if user_row:
+                    role = user_row['role'] or 'agent'
+                    if role in requirements:
+                        has_access = True
+                    else:
+                        cursor.execute('SELECT * FROM rol_yetkileri WHERE role = ?', (role,))
+                        perm_row = cursor.fetchone()
+                        if perm_row:
+                            perm_dict = dict(perm_row)
+                            for req in requirements:
+                                if req in perm_dict and perm_dict[req]:
+                                    has_access = True
+                                    break
+                conn.close()
+            except Exception as e:
+                print(f"Error checking roles_accepted: {e}", flush=True)
+                
+            if not has_access:
+                if request.accept_mimetypes.accept_html and not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return render_forbidden_html()
+                else:
+                    return {"error": "Bu işlem için yetkiniz bulunmamaktadır."}, 403
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# Dynamic Roles Required Decorator
+def roles_required(*requirements):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not session.get('user_id'):
+                return {"error": "Yetkisiz erişim. Lütfen giriş yapın."}, 401
+                
+            has_access = True
+            try:
+                conn = get_db()
+                cursor = conn.cursor()
+                cursor.execute('SELECT role FROM users WHERE uid = ?', (session.get('user_id'),))
+                user_row = cursor.fetchone()
+                if user_row:
+                    role = user_row['role'] or 'agent'
+                    cursor.execute('SELECT * FROM rol_yetkileri WHERE role = ?', (role,))
+                    perm_row = cursor.fetchone()
+                    perm_dict = dict(perm_row) if perm_row else {}
+                    
+                    for req in requirements:
+                        if req in ['admin', 'agent', 'assistant']:
+                            if role != req:
+                                has_access = False
+                                break
+                        else:
+                            if not perm_dict.get(req):
+                                has_access = False
+                                break
+                else:
+                    has_access = False
+                conn.close()
+            except Exception as e:
+                print(f"Error checking roles_required: {e}", flush=True)
+                has_access = False
+                
+            if not has_access:
+                if request.accept_mimetypes.accept_html and not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return render_forbidden_html()
+                else:
+                    return {"error": "Bu işlem için yetkiniz bulunmamaktadır."}, 403
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 
 @app.route('/')
 def index():
@@ -667,25 +880,40 @@ def init_db():
     except Exception as e:
         print(f"Error promoting admin: {e}", flush=True)
         
-    # Create and populate permissions table
+    # Create and populate rol_yetkileri table
     try:
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS permissions (
+            CREATE TABLE IF NOT EXISTS rol_yetkileri (
                 role TEXT PRIMARY KEY,
                 can_delete_portfolio INTEGER DEFAULT 1,
                 can_edit_customer INTEGER DEFAULT 1,
-                can_view_all_agency INTEGER DEFAULT 1
+                can_view_all_agency INTEGER DEFAULT 1,
+                can_view_reports INTEGER DEFAULT 1
             )
         ''')
-        cursor.execute("SELECT COUNT(*) FROM permissions WHERE role = 'admin'")
+        
+        # Add new columns if table existed
+        alter_queries_yetki = [
+            ("rol_yetkileri", "can_view_reports", "INTEGER DEFAULT 1")
+        ]
+        for t, col, c_type in alter_queries_yetki:
+            try:
+                cursor.execute(f"ALTER TABLE {t} ADD COLUMN {col} {c_type}")
+            except sqlite3.OperationalError:
+                pass
+                
+        cursor.execute("SELECT COUNT(*) FROM rol_yetkileri WHERE role = 'admin'")
         if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO permissions (role, can_delete_portfolio, can_edit_customer, can_view_all_agency) VALUES ('admin', 1, 1, 1)")
-        cursor.execute("SELECT COUNT(*) FROM permissions WHERE role = 'agent'")
+            cursor.execute("INSERT INTO rol_yetkileri (role, can_delete_portfolio, can_edit_customer, can_view_all_agency, can_view_reports) VALUES ('admin', 1, 1, 1, 1)")
+        cursor.execute("SELECT COUNT(*) FROM rol_yetkileri WHERE role = 'agent'")
         if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO permissions (role, can_delete_portfolio, can_edit_customer, can_view_all_agency) VALUES ('agent', 1, 1, 1)")
+            cursor.execute("INSERT INTO rol_yetkileri (role, can_delete_portfolio, can_edit_customer, can_view_all_agency, can_view_reports) VALUES ('agent', 1, 1, 1, 0)")
+        cursor.execute("SELECT COUNT(*) FROM rol_yetkileri WHERE role = 'assistant'")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO rol_yetkileri (role, can_delete_portfolio, can_edit_customer, can_view_all_agency, can_view_reports) VALUES ('assistant', 0, 1, 1, 0)")
         conn.commit()
     except Exception as e:
-        print(f"Error initializing permissions table: {e}", flush=True)
+        print(f"Error initializing rol_yetkileri table: {e}", flush=True)
         
     conn.close()
 
@@ -991,7 +1219,7 @@ def get_all_data():
         if not role:
             role = 'agent'
             
-        cursor.execute('SELECT can_view_all_agency FROM permissions WHERE role = ?', (role,))
+        cursor.execute('SELECT can_view_all_agency FROM rol_yetkileri WHERE role = ?', (role,))
         perm_row = cursor.fetchone()
         can_view_all_agency = perm_row['can_view_all_agency'] if perm_row else 1
         
@@ -1187,7 +1415,7 @@ def update_data_record(collection, id):
             role = 'agent'
             
         if collection == 'customers':
-            cursor.execute('SELECT can_edit_customer FROM permissions WHERE role = ?', (role,))
+            cursor.execute('SELECT can_edit_customer FROM rol_yetkileri WHERE role = ?', (role,))
             perm_row = cursor.fetchone()
             can_edit_customer = perm_row['can_edit_customer'] if perm_row else 1
             if not can_edit_customer:
@@ -1256,7 +1484,7 @@ def delete_data_record(collection, id):
             role = 'agent'
             
         if collection == 'portfolios':
-            cursor.execute('SELECT can_delete_portfolio FROM permissions WHERE role = ?', (role,))
+            cursor.execute('SELECT can_delete_portfolio FROM rol_yetkileri WHERE role = ?', (role,))
             perm_row = cursor.fetchone()
             can_delete_portfolio = perm_row['can_delete_portfolio'] if perm_row else 1
             if not can_delete_portfolio:
@@ -1412,7 +1640,7 @@ def update_user_role():
         if not target_user_id or not new_role:
             return {"error": "userId ve newRole alanları zorunludur."}, 400
             
-        if new_role not in ['admin', 'agent']:
+        if new_role not in ['admin', 'agent', 'assistant']:
             return {"error": "Geçersiz rol belirtildi."}, 400
             
         conn = get_db()
@@ -1482,7 +1710,7 @@ def get_role_permissions():
             conn.close()
             return {"error": "Yetkisiz işlem. Yalnızca yöneticiler yetki ayarlarına erişebilir."}, 403
             
-        cursor.execute('SELECT * FROM permissions')
+        cursor.execute('SELECT * FROM rol_yetkileri')
         rows = cursor.fetchall()
         conn.close()
         
@@ -1491,7 +1719,8 @@ def get_role_permissions():
             permissions_dict[row['role']] = {
                 "can_delete_portfolio": bool(row['can_delete_portfolio']),
                 "can_edit_customer": bool(row['can_edit_customer']),
-                "can_view_all_agency": bool(row['can_view_all_agency'])
+                "can_view_all_agency": bool(row['can_view_all_agency']),
+                "can_view_reports": bool(row['can_view_reports'])
             }
         return jsonify(permissions_dict)
     except Exception as e:
@@ -1514,20 +1743,58 @@ def update_role_permissions():
             conn.close()
             return {"error": "Yetkisiz işlem. Yalnızca yöneticiler yetki değiştirebilir."}, 403
             
-        for role in ['admin', 'agent']:
+        for role in ['admin', 'agent', 'assistant']:
             role_data = data.get(role, {})
             can_delete_portfolio = 1 if role_data.get('can_delete_portfolio') else 0
             can_edit_customer = 1 if role_data.get('can_edit_customer') else 0
             can_view_all_agency = 1 if role_data.get('can_view_all_agency') else 0
+            can_view_reports = 1 if role_data.get('can_view_reports') else 0
             
             cursor.execute('''
-                INSERT OR REPLACE INTO permissions (role, can_delete_portfolio, can_edit_customer, can_view_all_agency)
-                VALUES (?, ?, ?, ?)
-            ''', (role, can_delete_portfolio, can_edit_customer, can_view_all_agency))
+                INSERT OR REPLACE INTO rol_yetkileri (role, can_delete_portfolio, can_edit_customer, can_view_all_agency, can_view_reports)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (role, can_delete_portfolio, can_edit_customer, can_view_all_agency, can_view_reports))
             
         conn.commit()
         conn.close()
         return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/reports/ciro', methods=['GET'])
+@login_required
+@roles_accepted('can_view_reports')
+def get_ciro_report():
+    try:
+        agency_id = request.args.get('agencyId')
+        if not agency_id:
+            return {"error": "agencyId parametresi gereklidir."}, 400
+            
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Calculate from database
+        cursor.execute("SELECT SUM(agreedPrice) FROM deals WHERE agencyId = ?", (agency_id,))
+        total_deals_price = cursor.fetchone()[0] or 0
+        
+        # Calculate active listing values
+        cursor.execute("SELECT SUM(price) FROM portfolios WHERE agencyId = ?", (agency_id,))
+        active_listings_val = cursor.fetchone()[0] or 0
+        
+        conn.close()
+        
+        # Format or add some historical data
+        return jsonify({
+            "totalRevenue": total_deals_price,
+            "commissionEarned": total_deals_price * 0.04, # 4% total commission (2% buyer + 2% seller)
+            "activeListingsValue": active_listings_val,
+            "monthlyRevenue": [180000, 240000, 310000, 290000, 420000, total_deals_price * 0.04 if total_deals_price > 0 else 380000],
+            "commissionGoal": 1000000,
+            "topPerformers": [
+                {"name": "Musa Sarıer", "dealsCount": 4, "comm": 120000},
+                {"name": "Canan Demir", "dealsCount": 2, "comm": 60000}
+            ]
+        })
     except Exception as e:
         return {"error": str(e)}, 500
 

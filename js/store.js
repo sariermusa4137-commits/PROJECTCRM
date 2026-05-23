@@ -201,6 +201,11 @@ export async function apiFetch(url, options = {}) {
         showToast("Oturumunuz sonlandırıldı. Lütfen tekrar giriş yapın.", "error");
         throw new Error("Yetkisiz erişim. Oturum kapatıldı.");
     }
+    if (res.status === 403) {
+        window.location.hash = "#forbidden";
+        showToast("Bu işlem için yetkiniz bulunmamaktadır.", "error");
+        throw new Error("Yetkisiz erişim. 403 Forbidden.");
+    }
     return res;
 }
 

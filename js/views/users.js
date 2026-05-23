@@ -10,7 +10,7 @@ export async function renderUsersView(container) {
     container.innerHTML = `
         <div class="view-header" style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 4px;">
             <h2 style="font-family:'Outfit', sans-serif; font-weight:700; font-size:24px; margin:0;">Danışman Kadrosu</h2>
-            <p style="color:var(--text-secondary); font-size:13px; margin:0;">Sistemde kayıtlı olan tüm emlak danışmanları ve yöneticiler.</p>
+            <p style="color:var(--text-secondary); font-size:13px; margin:0;">Sistemde kayıtlı olan tüm emlak danışmanları, asistanlar ve yöneticiler.</p>
         </div>
 
         <div class="tabs-container" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
@@ -50,10 +50,10 @@ export async function renderUsersView(container) {
         <div id="users-tab-permissions" class="tab-pane" style="display: none;">
             <div class="card" style="padding: 24px;">
                 <h3 style="font-family:'Outfit', sans-serif; font-weight:600; font-size:18px; margin-top:0; margin-bottom:16px;">Rol Yetki Ayarları</h3>
-                <p style="color:var(--text-secondary); font-size:13px; margin-bottom:24px;">Sistemde kayıtlı rollerin (Yönetici ve Danışman) yapabileceği işlemleri buradan yapılandırabilirsiniz.</p>
+                <p style="color:var(--text-secondary); font-size:13px; margin-bottom:24px;">Sistemde kayıtlı rollerin yapabileceği işlemleri buradan dinamik olarak yapılandırabilirsiniz.</p>
                 
                 <form id="permissions-form" style="display:flex; flex-direction:column; gap:24px;">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:24px;">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
                         <!-- Admin Permissions Card -->
                         <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 20px;">
                             <h4 style="color:#c084fc; font-family:'Outfit', sans-serif; font-size:15px; margin-top:0; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
@@ -68,6 +68,9 @@ export async function renderUsersView(container) {
                                 </label>
                                 <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
                                     <input type="checkbox" name="admin_can_view_all_agency" style="accent-color:var(--primary-color);"> Tüm Acenteyi Görme
+                                </label>
+                                <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+                                    <input type="checkbox" name="admin_can_view_reports" style="accent-color:var(--primary-color);"> Ciro Raporlarını Görme
                                 </label>
                             </div>
                         </div>
@@ -86,6 +89,30 @@ export async function renderUsersView(container) {
                                 </label>
                                 <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
                                     <input type="checkbox" name="agent_can_view_all_agency" style="accent-color:var(--primary-color);"> Tüm Acenteyi Görme
+                                </label>
+                                <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+                                    <input type="checkbox" name="agent_can_view_reports" style="accent-color:var(--primary-color);"> Ciro Raporlarını Görme
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Assistant Permissions Card -->
+                        <div style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 20px;">
+                            <h4 style="color:#60a5fa; font-family:'Outfit', sans-serif; font-size:15px; margin-top:0; margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+                                <span style="background: rgba(59, 130, 246, 0.15); padding: 4px 8px; border-radius: 4px;">Assistant</span> Asistan Yetkileri
+                            </h4>
+                            <div style="display:flex; flex-direction:column; gap:12px;">
+                                <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+                                    <input type="checkbox" name="assistant_can_delete_portfolio" style="accent-color:var(--primary-color);"> Portföy Silme
+                                </label>
+                                <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+                                    <input type="checkbox" name="assistant_can_edit_customer" style="accent-color:var(--primary-color);"> Müşteri Düzenleme
+                                </label>
+                                <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+                                    <input type="checkbox" name="assistant_can_view_all_agency" style="accent-color:var(--primary-color);"> Tüm Acenteyi Görme
+                                </label>
+                                <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary); cursor:pointer;">
+                                    <input type="checkbox" name="assistant_can_view_reports" style="accent-color:var(--primary-color);"> Ciro Raporlarını Görme
                                 </label>
                             </div>
                         </div>
@@ -141,12 +168,20 @@ export async function renderUsersView(container) {
                         admin: {
                             can_delete_portfolio: form.querySelector('[name="admin_can_delete_portfolio"]').checked,
                             can_edit_customer: form.querySelector('[name="admin_can_edit_customer"]').checked,
-                            can_view_all_agency: form.querySelector('[name="admin_can_view_all_agency"]').checked
+                            can_view_all_agency: form.querySelector('[name="admin_can_view_all_agency"]').checked,
+                            can_view_reports: form.querySelector('[name="admin_can_view_reports"]').checked
                         },
                         agent: {
                             can_delete_portfolio: form.querySelector('[name="agent_can_delete_portfolio"]').checked,
                             can_edit_customer: form.querySelector('[name="agent_can_edit_customer"]').checked,
-                            can_view_all_agency: form.querySelector('[name="agent_can_view_all_agency"]').checked
+                            can_view_all_agency: form.querySelector('[name="agent_can_view_all_agency"]').checked,
+                            can_view_reports: form.querySelector('[name="agent_can_view_reports"]').checked
+                        },
+                        assistant: {
+                            can_delete_portfolio: form.querySelector('[name="assistant_can_delete_portfolio"]').checked,
+                            can_edit_customer: form.querySelector('[name="assistant_can_edit_customer"]').checked,
+                            can_view_all_agency: form.querySelector('[name="assistant_can_view_all_agency"]').checked,
+                            can_view_reports: form.querySelector('[name="assistant_can_view_reports"]').checked
                         }
                     };
 
@@ -200,10 +235,18 @@ export async function renderUsersView(container) {
             
             // Format role text and badge
             const isUserAdmin = user.role === 'admin';
-            const roleLabel = isUserAdmin ? 'Yönetici (Admin)' : 'Danışman (Agent)';
-            const roleBadgeStyle = isUserAdmin 
-                ? 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;'
-                : 'background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
+            const isUserAssistant = user.role === 'assistant';
+            
+            let roleLabel = 'Danışman (Agent)';
+            let roleBadgeStyle = 'background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
+            
+            if (isUserAdmin) {
+                roleLabel = 'Yönetici (Admin)';
+                roleBadgeStyle = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
+            } else if (isUserAssistant) {
+                roleLabel = 'Asistan (Assistant)';
+                roleBadgeStyle = 'background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
+            }
 
             const showDeleteBtn = isAdmin && user.uid !== activeUser.uid;
             const deleteBtnHtml = showDeleteBtn 
@@ -232,8 +275,9 @@ export async function renderUsersView(container) {
                     <td>
                         <div style="display: flex; align-items: center;">
                             <select class="role-select" data-uid="${user.uid}" ${isAdmin ? '' : 'disabled'} style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 6px 12px; color: var(--text-primary); font-size: 12px; cursor: ${isAdmin ? 'pointer' : 'not-allowed'}; min-width: 140px; outline: none; transition: all var(--transition-fast);">
-                                <option value="agent" ${!isUserAdmin ? 'selected' : ''}>Danışman (Agent)</option>
-                                <option value="admin" ${isUserAdmin ? 'selected' : ''}>Yönetici (Admin)</option>
+                                <option value="assistant" ${user.role === 'assistant' ? 'selected' : ''}>Asistan (Assistant)</option>
+                                <option value="agent" ${user.role === 'agent' ? 'selected' : ''}>Danışman (Agent)</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Yönetici (Admin)</option>
                             </select>
                             ${deleteBtnHtml}
                         </div>
@@ -331,9 +375,9 @@ async function loadPermissions(container) {
         const form = container.querySelector('#permissions-form');
         if (!form) return;
         
-        for (const role of ['admin', 'agent']) {
+        for (const role of ['admin', 'agent', 'assistant']) {
             const rolePerms = perms[role] || {};
-            for (const key of ['can_delete_portfolio', 'can_edit_customer', 'can_view_all_agency']) {
+            for (const key of ['can_delete_portfolio', 'can_edit_customer', 'can_view_all_agency', 'can_view_reports']) {
                 const input = form.querySelector(`[name="${role}_${key}"]`);
                 if (input) {
                     input.checked = !!rolePerms[key];

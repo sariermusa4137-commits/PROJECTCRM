@@ -11,6 +11,7 @@ import { renderSocialView } from './views/social.js';
 import { renderDealsView } from './views/deals.js';
 import { renderProfileView } from './views/profile.js';
 import { renderUsersView } from './views/users.js';
+import { renderReportsView } from './views/reports.js';
 import { showToast, openModal, closeModal } from './components/ui.js';
 
 // DOM Elements
@@ -167,7 +168,9 @@ function handleRouting() {
             social: "Sosyal Medya",
             deals: "Süreç Yönetimi",
             profile: "Profilim",
-            users: "Danışman Kadrosu"
+            users: "Danışman Kadrosu",
+            reports: "Ciro Raporu",
+            forbidden: "Erişim Engellendi"
         };
         breadcrumbActive.textContent = viewTitles[viewName] || viewName.toUpperCase();
     }
@@ -224,6 +227,19 @@ function renderActiveView(viewName) {
             break;
         case "users":
             renderUsersView(appView);
+            break;
+        case "reports":
+            renderReportsView(appView);
+            break;
+        case "forbidden":
+            appView.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 40px; text-align:center; min-height:60vh;">
+                    <div style="font-size:64px; margin-bottom:20px; animation: pulse 2s infinite ease-in-out;">🔒</div>
+                    <h2 style="font-family:'Outfit', sans-serif; font-weight:700; font-size:24px; margin:0 0 12px 0; color:var(--text-primary);">Yetkisiz Erişim</h2>
+                    <p style="color:var(--text-secondary); font-size:14px; max-width:400px; line-height:1.6; margin:0 0 24px 0;">Bu sayfaya veya işleme erişim yetkiniz bulunmamaktadır. Lütfen sistem yöneticiniz ile iletişime geçin.</p>
+                    <a href="#dashboard" class="btn btn-primary" style="padding:10px 20px; font-weight:600; font-size:13px;">Ana Sayfaya Dön</a>
+                </div>
+            `;
             break;
         default:
             appView.innerHTML = `<div style="padding:40px; text-align:center;"><h2>Görünüm bulunamadı (404)</h2></div>`;
