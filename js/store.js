@@ -123,6 +123,30 @@ function notify() {
 
 // ----------------- BUSINESS ACTIONS -----------------
 
+// Login or register user via Google Login Simulator
+export async function loginWithGoogleSimulator(email, name, picture) {
+    const res = await fetch('/api/auth/google/login-simulator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, picture })
+    });
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Google simülasyon girişi başarısız oldu.");
+    }
+    const data = await res.json();
+    state.currentUser = data.user;
+    state.agency = data.agency;
+    
+    localStorage.setItem("projectcrm_user_id", data.user.uid);
+    
+    if (state.agency && state.agency.id) {
+        await fetchAllData(state.agency.id);
+        startPolling();
+    }
+    notify();
+}
+
 // Login or register local user
 export async function loginWithLocalUser(email, displayName) {
     const res = await fetch('/api/auth/login', {

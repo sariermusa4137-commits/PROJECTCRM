@@ -18,30 +18,11 @@ from datetime import timedelta
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
 
-from authlib.integrations.flask_client import OAuth
-
 app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'PROJECTCRM_SECURE_SECRET_2026_KEY')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-
-oauth = OAuth(app)
-google = oauth.register(
-    name='google',
-    client_id=os.environ.get('GOOGLE_CLIENT_ID', 'DUMMY_GOOGLE_CLIENT_ID'),
-    client_secret=os.environ.get('GOOGLE_CLIENT_SECRET', 'DUMMY_GOOGLE_CLIENT_SECRET'),
-    access_token_url='https://oauth2.googleapis.com/token',
-    access_token_params=None,
-    authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
-    authorize_params=None,
-    api_base_url='https://www.googleapis.com/oauth2/v1/',
-    userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
-    client_kwargs={'scope': 'openid email profile'},
-    jwks_uri="https://www.googleapis.com/oauth2/v3/certs"
-)
-
-has_google_credentials = bool(os.environ.get('GOOGLE_CLIENT_ID') and os.environ.get('GOOGLE_CLIENT_SECRET'))
 
 def login_required(f):
     @wraps(f)
@@ -715,173 +696,33 @@ def login_or_register_oauth_user(email, name, picture):
     conn.close()
     return user_data
 
-@app.route('/api/auth/google/login')
-def google_login():
-    if not has_google_credentials:
-        return redirect(url_for('google_mock_login_page'))
-    
-    redirect_uri = url_for('google_callback', _external=True)
-    if not request.host.startswith('localhost') and not request.host.startswith('127.0.0.1'):
-        redirect_uri = redirect_uri.replace('http://', 'https://')
-    return google.authorize_redirect(redirect_uri)
-
-@app.route('/api/auth/google/callback')
-def google_callback():
-    if not has_google_credentials:
-        return redirect(url_for('google_mock_login_page'))
-        
+@app.route('/api/auth/google/login-simulator', methods=['POST'])
+def google_login_simulator():
     try:
-        token = google.authorize_access_token()
-        resp = google.get('userinfo')
-        user_info = resp.json()
+        data = request.get_json() or {}
+        email = data.get('email', '').strip().lower()
+        name = data.get('name', '').strip()
+        picture = data.get('picture', '').strip()
         
-        email = user_info.get('email', '').strip().lower()
-        name = user_info.get('name', '').strip()
-        picture = user_info.get('picture', '').strip()
-        
-        if not email:
-            return "Google account has no email address.", 400
+        if not email or not name:
+            return {"error": "E-posta ve Ad Soyad gereklidir."}, 400
             
         user_data = login_or_register_oauth_user(email, name, picture)
         
         session['user_id'] = user_data['uid']
         session.permanent = True
         
-        return redirect('/')
-    except Exception as e:
-        return f"Authentication failed: {str(e)}", 500
-
-@app.route('/api/auth/google/mock')
-def google_mock_login_page():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>PROJECTCRM - Google OAuth Developer Mode</title>
-        <meta charset="utf-8">
-        <style>
-            body {
-                background-color: #0f172a;
-                color: #f8fafc;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                margin: 0;
-            }
-            .card {
-                background: rgba(30, 41, 59, 0.7);
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 12px;
-                padding: 32px;
-                width: 400px;
-                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-            }
-            h1 {
-                font-size: 24px;
-                margin-top: 0;
-                margin-bottom: 12px;
-                color: #6366f1;
-                text-align: center;
-            }
-            p {
-                color: #94a3b8;
-                font-size: 14px;
-                line-height: 1.5;
-                margin-bottom: 24px;
-                text-align: center;
-            }
-            .form-group {
-                margin-bottom: 16px;
-            }
-            label {
-                display: block;
-                font-size: 12px;
-                font-weight: 600;
-                text-transform: uppercase;
-                color: #94a3b8;
-                margin-bottom: 6px;
-            }
-            input {
-                width: 100%;
-                padding: 10px 12px;
-                background: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 6px;
-                color: white;
-                box-sizing: border-box;
-                font-size: 14px;
-            }
-            input:focus {
-                outline: none;
-                border-color: #6366f1;
-            }
-            .btn {
-                width: 100%;
-                padding: 12px;
-                background: #6366f1;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-weight: 600;
-                cursor: pointer;
-                font-size: 14px;
-                transition: background 0.2s;
-            }
-            .btn:hover {
-                background: #4f46e5;
-            }
-            .hint {
-                font-size: 12px;
-                color: #e2e8f0;
-                background: rgba(245, 158, 11, 0.15);
-                border: 1px solid rgba(245, 158, 11, 0.3);
-                border-radius: 6px;
-                padding: 10px;
-                margin-bottom: 20px;
-                text-align: center;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <h1>Geliştirici Giriş Paneli</h1>
-            <div class="hint">
-                <strong>Google OAuth Aktif Değil:</strong> GOOGLE_CLIENT_ID / SECRET bulunamadığı için yerel geliştirici modu devrededir.
-            </div>
-            <p>Test etmek için herhangi bir e-posta ve ad soyad girerek oturum açın.</p>
-            <form action="/api/auth/google/mock-callback" method="POST">
-                <div class="form-group">
-                    <label>Ad Soyad</label>
-                    <input type="text" name="name" value="Musa Danışman" required>
-                </div>
-                <div class="form-group">
-                    <label>E-posta Adresi</label>
-                    <input type="email" name="email" value="musa@danisman.com" required>
-                </div>
-                <button type="submit" class="btn">Simüle Et (Google ile Giriş Yap)</button>
-            </form>
-        </div>
-    </body>
-    </html>
-    '''
-
-@app.route('/api/auth/google/mock-callback', methods=['POST'])
-def google_mock_callback():
-    email = request.form.get('email', '').strip().lower()
-    name = request.form.get('name', '').strip()
-    
-    if not email or not name:
-        return "Email and name are required", 400
+        # Look up their agency details
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_data['agencyId'],))
+        agency = cursor.fetchone()
+        agency_data = dict(agency) if agency else None
+        conn.close()
         
-    user_data = login_or_register_oauth_user(email, name, "")
-    
-    session['user_id'] = user_data['uid']
-    session.permanent = True
-    
-    return redirect('/')
+        return {"success": True, "user": user_data, "agency": agency_data}
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 # API Routes
 @app.route('/api/auth/login', methods=['POST'])
