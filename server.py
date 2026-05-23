@@ -1257,8 +1257,38 @@ def profile_upload():
             cursor.execute('UPDATE users SET profile_image = ?, photoURL = ? WHERE uid = ?', (relative_url, relative_url, uid))
             conn.commit()
             conn.close()
-            
             return {"success": True, "profile_image": relative_url}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/users', methods=['GET'])
+@login_required
+def get_users():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT u.uid, u.displayName, u.email, u.photoURL, u.agencyId, u.createdAt, 
+                   u.firstName, u.lastName, u.phone, u.profile_image, 
+                   a.createdById as agencyOwnerId, a.name as agencyName
+            FROM users u
+            LEFT JOIN agencies a ON u.agencyId = a.id
+            ORDER BY u.createdAt DESC
+        ''')
+        rows = cursor.fetchall()
+        users_list = []
+        for r in rows:
+            item = dict(r)
+            # Determine role: if they are the creator of their agency, they are 'Yönetici', else 'Danışman'
+            is_owner = item.get('uid') == item.get('agencyOwnerId')
+            item['role'] = 'Yönetici' if is_owner else 'Danışman'
+            if 'agencyOwnerId' in item:
+                del item['agencyOwnerId']
+            users_list.append(item)
+            
+        conn.close()
+        return jsonify(users_list)
     except Exception as e:
         return {"error": str(e)}, 500
 

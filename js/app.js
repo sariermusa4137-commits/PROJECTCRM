@@ -10,6 +10,7 @@ import { renderLocationsView } from './views/locations.js';
 import { renderSocialView } from './views/social.js';
 import { renderDealsView } from './views/deals.js';
 import { renderProfileView } from './views/profile.js';
+import { renderUsersView } from './views/users.js';
 import { showToast, openModal, closeModal } from './components/ui.js';
 
 // DOM Elements
@@ -165,7 +166,8 @@ function handleRouting() {
             locations: "Bölge Analizleri",
             social: "Sosyal Medya",
             deals: "Süreç Yönetimi",
-            profile: "Profilim"
+            profile: "Profilim",
+            users: "Danışman Kadrosu"
         };
         breadcrumbActive.textContent = viewTitles[viewName] || viewName.toUpperCase();
     }
@@ -219,6 +221,9 @@ function renderActiveView(viewName) {
             break;
         case "profile":
             renderProfileView(appView);
+            break;
+        case "users":
+            renderUsersView(appView);
             break;
         default:
             appView.innerHTML = `<div style="padding:40px; text-align:center;"><h2>Görünüm bulunamadı (404)</h2></div>`;
