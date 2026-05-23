@@ -128,7 +128,7 @@ function handleRouting() {
     let hash = window.location.hash || "#dashboard";
     
     // Auth Check
-    const isAuthenticated = !!(state.currentUser && state.currentUser.agencyId);
+    const isAuthenticated = !!state.currentUser;
     
     // If not authenticated, force them to Auth View
     if (!isAuthenticated) {

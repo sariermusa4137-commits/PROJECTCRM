@@ -1,6 +1,6 @@
 // PROJECTCRM - User Profile Settings View Module
 
-import { state, updateCurrentUser, apiFetch } from '../store.js';
+import { state, updateCurrentUser, apiFetch, createAgency, joinAgency } from '../store.js';
 import { showToast } from '../components/ui.js';
 
 export function renderProfileView(container) {
@@ -90,6 +90,54 @@ export function renderProfileView(container) {
                                 <button type="submit" class="btn btn-primary" id="btn-save-profile">Bilgileri Güncelle</button>
                             </div>
                         </form>
+                    </div>
+                    
+                    <div class="profile-card info-card">
+                        <div class="card-header-simple">
+                            <div class="card-icon-wrapper highlight" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-md"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+                            </div>
+                            <h3>Acente / Ofis Bilgileri</h3>
+                        </div>
+                        
+                        <form id="form-profile-agency" class="profile-form">
+                            <div class="form-group">
+                                <label for="p-agency-name">Aktif Acente / Çalışma Alanı Adı</label>
+                                <input type="text" id="p-agency-name" value="${state.agency ? state.agency.name : ''}" required placeholder="Örn: RE/MAX İkon">
+                                <span style="font-size:11px; color:var(--text-muted); display:block; margin-top:6px;">
+                                    ${state.agency && state.agency.id !== user.uid ? `Ortak Acente Kodu: <strong style="color:var(--secondary); letter-spacing:0.5px;">${state.agency.id}</strong> (Bu kodla çalışma arkadaşlarınız bağlanabilir)` : 'Şu anda bireysel çalışma alanındasınız.'}
+                                </span>
+                            </div>
+                            
+                            <div class="form-actions-profile">
+                                <button type="submit" class="btn btn-primary" id="btn-save-agency">Acente Adını Güncelle</button>
+                            </div>
+                        </form>
+                        
+                        <div style="border-top: 1px solid var(--border-color); margin-top: 24px; padding-top: 20px;">
+                            <h4 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600;">Ortak Çalışma Alanı Değiştir</h4>
+                            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+                                Diğer danışmanlarla ortak portföy havuzuna geçmek için yeni bir ortak acente kurabilir ya da mevcut bir acente koduna bağlanabilirsiniz.
+                            </p>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
+                                <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-md); display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h5 style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: var(--primary);">Yeni Acente Oluştur</h5>
+                                        <input type="text" id="p-agency-create-name" placeholder="Örn: Danışman Emlak" style="font-size: 12px; padding: 6px 10px; margin-bottom: 10px; width: 100%; box-sizing: border-box; background: var(--bg-dark); border: 1px solid var(--border-color); color: white; border-radius: 4px;">
+                                    </div>
+                                    <button id="btn-profile-agency-create" type="button" class="btn btn-secondary" style="font-size: 11px; padding: 6px 12px; width: 100%;">Kur ve Kod Üret</button>
+                                </div>
+                                
+                                <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-md); display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h5 style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: var(--secondary);">Ortak Acenteye Katıl</h5>
+                                        <input type="text" id="p-agency-join-code" placeholder="6 Haneli Kod" maxlength="6" style="text-transform: uppercase; font-size: 12px; padding: 6px 10px; margin-bottom: 10px; width: 100%; box-sizing: border-box; background: var(--bg-dark); border: 1px solid var(--border-color); color: white; border-radius: 4px;">
+                                    </div>
+                                    <button id="btn-profile-agency-join" type="button" class="btn btn-outline" style="font-size: 11px; padding: 6px 12px; width: 100%;">Koda Katıl</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="profile-card info-card">
@@ -269,6 +317,102 @@ function setupProfileEventListeners(container, uid) {
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = "Şifreyi Güncelle";
+            }
+        });
+    }
+
+    // Update Agency Name Form
+    const agencyForm = container.querySelector('#form-profile-agency');
+    if (agencyForm) {
+        agencyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = container.querySelector('#p-agency-name').value.trim();
+            const saveBtn = container.querySelector('#btn-save-agency');
+            
+            if (!name) {
+                showToast("Acente adı boş olamaz.", "warning");
+                return;
+            }
+            
+            try {
+                saveBtn.disabled = true;
+                saveBtn.textContent = "Kaydediliyor...";
+                
+                const response = await apiFetch('/api/agency/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agencyId: state.agency.id,
+                        name
+                    })
+                });
+                
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || "Acente ismi güncellenemedi.");
+                }
+                
+                state.agency = result.agency;
+                
+                // Re-render profile page to reflect changes
+                renderProfileView(container);
+                showToast("Acente/Ofis bilgileri başarıyla güncellendi.", "success");
+            } catch (err) {
+                console.error("Agency update failed:", err);
+                showToast(err.message, "error");
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Acente Adını Güncelle";
+            }
+        });
+    }
+
+    // Create Shared Agency from Profile Page
+    const btnCreateAgency = container.querySelector('#btn-profile-agency-create');
+    if (btnCreateAgency) {
+        btnCreateAgency.addEventListener('click', async () => {
+            const agencyName = container.querySelector('#p-agency-create-name').value.trim();
+            if (!agencyName) {
+                showToast("Lütfen oluşturmak istediğiniz acente adını girin.", "warning");
+                return;
+            }
+            
+            try {
+                btnCreateAgency.disabled = true;
+                showToast("Acente oluşturuluyor...", "info");
+                const code = await createAgency(agencyName);
+                showToast(`Acente Başarıyla Oluşturuldu! Kodu: ${code}`, "success");
+                renderProfileView(container);
+            } catch (err) {
+                console.error(err);
+                showToast("Acente oluşturulurken hata: " + err.message, "error");
+            } finally {
+                btnCreateAgency.disabled = false;
+            }
+        });
+    }
+
+    // Join Shared Agency from Profile Page
+    const btnJoinAgency = container.querySelector('#btn-profile-agency-join');
+    if (btnJoinAgency) {
+        btnJoinAgency.addEventListener('click', async () => {
+            const code = container.querySelector('#p-agency-join-code').value.trim();
+            if (!code) {
+                showToast("Lütfen 6 haneli katılım kodunu girin.", "warning");
+                return;
+            }
+            
+            try {
+                btnJoinAgency.disabled = true;
+                showToast("Acenteye bağlanıyor...", "info");
+                await joinAgency(code);
+                showToast("Acenteye başarıyla katıldınız!", "success");
+                renderProfileView(container);
+            } catch (err) {
+                console.error(err);
+                showToast("Acenteye katılırken hata: " + err.message, "error");
+            } finally {
+                btnJoinAgency.disabled = false;
             }
         });
     }
