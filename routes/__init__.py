@@ -12,6 +12,7 @@ from .calendar import calendar_bp
 from .profile import profile_bp
 from .export import export_bp
 from .static_routes import static_bp
+from .matchmaking import matchmaking_bp
 
 ALL_BLUEPRINTS = [
     auth_bp,
@@ -23,4 +24,5 @@ ALL_BLUEPRINTS = [
     profile_bp,
     export_bp,
     static_bp,
+    matchmaking_bp,
 ]

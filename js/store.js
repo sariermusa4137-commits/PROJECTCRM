@@ -16,6 +16,7 @@ export const state = {
     activities: [],
     deals: [],
     regionNews: [],
+    opportunities: [],
     
     // Callbacks for UI updates
     listeners: new Set()
@@ -64,6 +65,16 @@ export async function fetchAllData(agencyId) {
         throw new Error("Veriler sunucudan alınamadı.");
     }
     const data = await res.json();
+
+    let matchmakingData = [];
+    try {
+        const matchRes = await apiFetch(`/api/matchmaking/opportunities?agencyId=${agencyId}`);
+        if (matchRes.ok) {
+            matchmakingData = await matchRes.json();
+        }
+    } catch (e) {
+        console.error("Matchmaking opportunities fetch failed:", e);
+    }
     
     // Check if anything has actually changed in the caches to prevent layout thrashing and focus loss
     const changed = JSON.stringify(state.portfolios) !== JSON.stringify(data.portfolios) ||
@@ -72,7 +83,8 @@ export async function fetchAllData(agencyId) {
                     JSON.stringify(state.todos) !== JSON.stringify(data.todos) ||
                     JSON.stringify(state.activities) !== JSON.stringify(data.activities) ||
                     JSON.stringify(state.deals) !== JSON.stringify(data.deals) ||
-                    JSON.stringify(state.locations) !== JSON.stringify(data.locations);
+                    JSON.stringify(state.locations) !== JSON.stringify(data.locations) ||
+                    JSON.stringify(state.opportunities) !== JSON.stringify(matchmakingData);
                     
     if (changed) {
         state.portfolios = (data.portfolios || []).map(item => syncFields('portfolios', item));
@@ -82,6 +94,7 @@ export async function fetchAllData(agencyId) {
         state.activities = (data.activities || []).map(item => syncFields('activities', item));
         state.deals = (data.deals || []).map(item => syncFields('deals', item));
         state.locations = (data.locations || []).map(item => syncFields('locations', item));
+        state.opportunities = matchmakingData || [];
         notify();
     }
 }
@@ -191,6 +204,7 @@ export async function logout() {
     state.activities = [];
     state.deals = [];
     state.locations = [];
+    state.opportunities = [];
     notify();
 }
 

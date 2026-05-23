@@ -14,6 +14,12 @@ function formatDate(dateString) {
     }
 }
 
+// Price formatter
+function formatPrice(price) {
+    if (!price) return "";
+    return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(price);
+}
+
 export function renderDashboardView(container) {
     // 1. Calculate statistics
     const totalPortfolios = state.portfolios.length;
@@ -135,6 +141,31 @@ export function renderDashboardView(container) {
                 </div>
             `).join('');
         }
+
+        // Update Matchmaking
+        const matchmakingList = container.querySelector('.matchmaking-list');
+        if (matchmakingList) {
+            const opps = state.opportunities || [];
+            matchmakingList.innerHTML = opps.length === 0 ? `
+                <p style="color:var(--text-muted); font-size:13px; text-align:center; padding-top:40px;">Eşleşen aktif fırsat bulunamadı.</p>
+            ` : opps.slice(0, 5).map(opp => `
+                <div class="match-item" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: all 0.2s ease;">
+                    <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex-grow: 1;">
+                        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                            ${opp.customer.name} ↔ ${opp.portfolio.title}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 4px 12px;">
+                            <span>📍 ${opp.portfolio.neighborhood ? opp.portfolio.neighborhood + ', ' : ''}${opp.portfolio.district}</span>
+                            <span>🛏️ ${opp.portfolio.rooms}</span>
+                            <span>💰 ${formatPrice(opp.portfolio.price)}</span>
+                        </div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #8b5cf6, #3b82f6); border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 700; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(139, 92, 246, 0.4); flex-shrink: 0;">
+                        %${opp.score}
+                    </div>
+                </div>
+            `).join('');
+        }
         
         setupTodoListeners(container);
         setupBirthdayListeners(container);
@@ -245,8 +276,44 @@ export function renderDashboardView(container) {
                 
             </div>
             
-            <!-- Right Side: Birthday Reminders -->
-            <div>
+            <!-- Right Side: Matchmaking & Birthday Reminders -->
+            <div style="display:flex; flex-direction:column; gap:32px;">
+                <!-- AI Matchmaking Card -->
+                <div class="card ai-matchmaking-card" style="border: 1px solid rgba(139, 92, 246, 0.35); box-shadow: 0 8px 32px 0 rgba(139, 92, 246, 0.15), 0 0 16px 0 rgba(59, 130, 246, 0.1); background: rgba(30, 20, 50, 0.25); backdrop-filter: blur(8px); position: relative; overflow: hidden;">
+                    <!-- Ambient Glow Effects inside card -->
+                    <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(0,0,0,0) 70%); pointer-events: none;"></div>
+                    <div style="position: absolute; bottom: -50px; left: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(0,0,0,0) 70%); pointer-events: none;"></div>
+                    
+                    <h3 style="color: #c084fc; display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif; font-size: 16px; margin: 0;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: #a855f7; filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.5));"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        AI Akıllı Eşleştirme Fırsatları
+                    </h3>
+                    <p style="font-size:12px; color:var(--text-secondary); margin-top:4px; margin-bottom: 16px;">Müşteri talepleri ve aktif portföyler arasında en yüksek uyumlu eşleşmeler.</p>
+                    
+                    <div class="matchmaking-list" style="display:flex; flex-direction:column; gap:12px;">
+                        ${(state.opportunities || []).length === 0 ? `
+                            <p style="color:var(--text-muted); font-size:13px; text-align:center; padding-top:40px;">Eşleşen aktif fırsat bulunamadı.</p>
+                        ` : (state.opportunities || []).slice(0, 5).map(opp => `
+                            <div class="match-item" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: all 0.2s ease;">
+                                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex-grow: 1;">
+                                    <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                                        ${opp.customer.name} ↔ ${opp.portfolio.title}
+                                    </div>
+                                    <div style="font-size: 11px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 4px 12px;">
+                                        <span>📍 ${opp.portfolio.neighborhood ? opp.portfolio.neighborhood + ', ' : ''}${opp.portfolio.district}</span>
+                                        <span>🛏️ ${opp.portfolio.rooms}</span>
+                                        <span>💰 ${formatPrice(opp.portfolio.price)}</span>
+                                    </div>
+                                </div>
+                                <div style="background: linear-gradient(135deg, #8b5cf6, #3b82f6); border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 700; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(139, 92, 246, 0.4); flex-shrink: 0;">
+                                    %${opp.score}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <!-- Doğum Günü Hatırlatmaları -->
                 <div class="card" style="height:100%;">
                     <h3>Doğum Günü Hatırlatmaları</h3>
                     <p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Gelecek 7 gün içindeki doğum günleri listelenir.</p>
