@@ -123,16 +123,16 @@ function notify() {
 
 // ----------------- BUSINESS ACTIONS -----------------
 
-// Login or register user via Google Login Simulator
-export async function loginWithGoogleSimulator(email, name, picture) {
-    const res = await fetch('/api/auth/google/login-simulator', {
+// Login user
+export async function login(email, password) {
+    const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, picture })
+        body: JSON.stringify({ email, password })
     });
     if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "Google simülasyon girişi başarısız oldu.");
+        throw new Error(err.error || "Giriş başarısız oldu.");
     }
     const data = await res.json();
     state.currentUser = data.user;
@@ -147,16 +147,16 @@ export async function loginWithGoogleSimulator(email, name, picture) {
     notify();
 }
 
-// Login or register local user
-export async function loginWithLocalUser(email, displayName) {
-    const res = await fetch('/api/auth/login', {
+// Register user
+export async function register(firstName, lastName, email, password) {
+    const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, displayName })
+        body: JSON.stringify({ firstName, lastName, email, password })
     });
     if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "Giriş yapılamadı.");
+        throw new Error(err.error || "Kayıt başarısız oldu.");
     }
     const data = await res.json();
     state.currentUser = data.user;

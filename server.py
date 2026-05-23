@@ -13,6 +13,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from functools import wraps
 from datetime import timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Ensure JS/CSS mimetypes are registered correctly for ES modules
 mimetypes.add_type('application/javascript', '.js')
@@ -650,94 +651,74 @@ def init_db():
 with app.app_context():
     init_db()
 
-def login_or_register_oauth_user(email, name, picture):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
-    user = cursor.fetchone()
-    
-    if user:
-        user_data = dict(user)
-        # Update name and avatar if they exist/changed
-        cursor.execute('''
-            UPDATE users 
-            SET displayName = ?, photoURL = ?, profile_image = ?
-            WHERE uid = ?
-        ''', (name, picture or user_data['photoURL'], picture or user_data['profile_image'], user_data['uid']))
-        conn.commit()
+@app.route('/api/auth/register', methods=['POST'])
+def auth_register():
+    try:
+        data = request.get_json() or {}
+        first_name = data.get('firstName', '').strip()
+        last_name = data.get('lastName', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
         
-        # Refetch updated user
-        cursor.execute('SELECT * FROM users WHERE uid = ?', (user_data['uid'],))
-        user_data = dict(cursor.fetchone())
-    else:
+        if not first_name or not email or not password:
+            return {"error": "Ad, E-posta ve Şifre alanları zorunludur."}, 400
+            
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Check if email is already registered
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        if cursor.fetchone():
+            conn.close()
+            return {"error": "Bu e-posta adresi zaten kayıtlıdır."}, 400
+            
+        # Hash password and compute deterministic user properties
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, email))
         created_at = datetime.datetime.now().isoformat()
-        names = name.split(' ', 1)
-        first_name = names[0]
-        last_name = names[1] if len(names) > 1 else ""
+        display_name = f"{first_name} {last_name}".strip()
         
-        # We automatically assign their own 'uid' as their personal workspace (agencyId)
-        # and create their personal agency automatically.
+        # Automatically assign their own 'uid' as personal agencyId and create agency
         agency_id = uid
-        agency_name = f"{name} (Bireysel)"
+        agency_name = f"{display_name} (Bireysel)"
         
         cursor.execute('''
-            INSERT INTO agencies (id, name, createdById, createdAt)
+            INSERT OR IGNORE INTO agencies (id, name, createdById, createdAt)
             VALUES (?, ?, ?, ?)
         ''', (agency_id, agency_name, uid, created_at))
         
         cursor.execute('''
             INSERT INTO users (uid, displayName, email, photoURL, agencyId, createdAt, firstName, lastName, phone, password, profile_image)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (uid, name, email, picture, agency_id, created_at, first_name, last_name, "", "", picture))
+        ''', (uid, display_name, email, "", agency_id, created_at, first_name, last_name, "", hashed_password, ""))
         
         conn.commit()
         
         cursor.execute('SELECT * FROM users WHERE uid = ?', (uid,))
         user_data = dict(cursor.fetchone())
         
-    conn.close()
-    return user_data
-
-@app.route('/api/auth/google/login-simulator', methods=['POST'])
-def google_login_simulator():
-    try:
-        data = request.get_json() or {}
-        email = data.get('email', '').strip().lower()
-        name = data.get('name', '').strip()
-        picture = data.get('picture', '').strip()
+        cursor.execute('SELECT * FROM agencies WHERE id = ?', (agency_id,))
+        agency_data = dict(cursor.fetchone())
         
-        if not email or not name:
-            return {"error": "E-posta ve Ad Soyad gereklidir."}, 400
-            
-        user_data = login_or_register_oauth_user(email, name, picture)
-        
-        session['user_id'] = user_data['uid']
-        session.permanent = True
-        
-        # Look up their agency details
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_data['agencyId'],))
-        agency = cursor.fetchone()
-        agency_data = dict(agency) if agency else None
         conn.close()
+        
+        # Start persistent session
+        session['user_id'] = uid
+        session.permanent = True
         
         return {"success": True, "user": user_data, "agency": agency_data}
     except Exception as e:
         return {"error": str(e)}, 500
 
-# API Routes
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
     try:
         data = request.get_json() or {}
         email = data.get('email', '').strip().lower()
-        display_name = data.get('displayName', '').strip()
+        password = data.get('password', '')
         
-        if not email or not display_name:
-            return {"error": "E-posta ve Ad Soyad gereklidir."}, 400
+        if not email or not password:
+            return {"error": "E-posta ve Şifre alanları zorunludur."}, 400
             
         conn = get_db()
         cursor = conn.cursor()
@@ -745,22 +726,17 @@ def auth_login():
         cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
         user = cursor.fetchone()
         
-        if user:
-            user_data = dict(user)
-        else:
-            uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, email))
-            created_at = datetime.datetime.now().isoformat()
-            names = display_name.split(' ', 1)
-            first_name = names[0]
-            last_name = names[1] if len(names) > 1 else ""
-            cursor.execute('''
-                INSERT INTO users (uid, displayName, email, photoURL, agencyId, createdAt, firstName, lastName, phone, password, profile_image)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (uid, display_name, email, "", "", created_at, first_name, last_name, "", "", ""))
-            conn.commit()
+        if not user:
+            conn.close()
+            return {"error": "E-posta adresi veya şifre hatalı."}, 401
             
-            cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
-            user_data = dict(cursor.fetchone())
+        user_data = dict(user)
+        
+        # Check password hash
+        hashed_pwd = user_data.get('password')
+        if not hashed_pwd or not check_password_hash(hashed_pwd, password):
+            conn.close()
+            return {"error": "E-posta adresi veya şifre hatalı."}, 401
             
         agency_data = None
         if user_data['agencyId']:
