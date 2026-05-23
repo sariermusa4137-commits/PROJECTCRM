@@ -3,6 +3,9 @@
 import { state, apiFetch } from '../store.js';
 import { showToast } from '../components/ui.js';
 
+// Store the active chart instance to prevent leaks and canvas errors
+let revenueChart = null;
+
 export async function renderReportsView(container) {
     if (!state.agency) {
         container.innerHTML = `
@@ -11,6 +14,12 @@ export async function renderReportsView(container) {
                 <p>Ciro raporunu görüntülemek için önce bir acenteye katılmalı veya acente oluşturmalısınız.</p>
             </div>
         `;
+        return;
+    }
+
+    // Guard to prevent infinite flickering and re-rendering of structural skeleton
+    if (container.querySelector('#reports-content')) {
+        await updateReportsData(container);
         return;
     }
 
@@ -87,6 +96,10 @@ export async function renderReportsView(container) {
         </div>
     `;
 
+    await updateReportsData(container);
+}
+
+export async function updateReportsData(container) {
     const loadingEl = container.querySelector('#reports-loading');
     const contentEl = container.querySelector('#reports-content');
 
@@ -97,45 +110,59 @@ export async function renderReportsView(container) {
         }
         const data = await res.json();
 
-        loadingEl.style.display = 'none';
-        contentEl.style.display = 'flex';
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (contentEl) contentEl.style.display = 'flex';
 
         // Render metrics
-        container.querySelector('#stat-total-revenue').textContent = formatCurrency(data.totalRevenue);
-        container.querySelector('#stat-commission').textContent = formatCurrency(data.commissionEarned);
-        container.querySelector('#stat-active-listings').textContent = formatCurrency(data.activeListingsValue);
+        const totalRevenueEl = container.querySelector('#stat-total-revenue');
+        const commissionEl = container.querySelector('#stat-commission');
+        const activeListingsEl = container.querySelector('#stat-active-listings');
+        if (totalRevenueEl) totalRevenueEl.textContent = formatCurrency(data.totalRevenue);
+        if (commissionEl) commissionEl.textContent = formatCurrency(data.commissionEarned);
+        if (activeListingsEl) activeListingsEl.textContent = formatCurrency(data.activeListingsValue);
 
         // Render Goal
         const targetGoal = data.commissionGoal || 1000000;
         const currentComm = data.commissionEarned || 0;
         const percent = Math.min(100, Math.round((currentComm / targetGoal) * 100));
-        container.querySelector('#goal-percent').textContent = `${percent}%`;
-        container.querySelector('#goal-bar').style.width = `${percent}%`;
-        container.querySelector('#goal-current').textContent = formatCurrency(currentComm);
+        
+        const goalPercentEl = container.querySelector('#goal-percent');
+        const goalBarEl = container.querySelector('#goal-bar');
+        const goalCurrentEl = container.querySelector('#goal-current');
+        
+        if (goalPercentEl) goalPercentEl.textContent = `${percent}%`;
+        if (goalBarEl) goalBarEl.style.width = `${percent}%`;
+        if (goalCurrentEl) goalCurrentEl.textContent = formatCurrency(currentComm);
 
         // Render performers
         const performersList = container.querySelector('#performers-list');
-        performersList.innerHTML = data.topPerformers.map((p, index) => {
-            const colors = ['#fbbf24', '#cbd5e1']; // Gold, Silver
-            const badgeColor = colors[index] || 'var(--text-muted)';
-            return `
-                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-weight: 700; color: ${badgeColor}; font-size: 14px;">#${index + 1}</span>
-                        <span style="color: var(--text-primary); font-weight: 500;">${p.name}</span>
+        if (performersList) {
+            performersList.innerHTML = data.topPerformers.map((p, index) => {
+                const colors = ['#fbbf24', '#cbd5e1']; // Gold, Silver
+                const badgeColor = colors[index] || 'var(--text-muted)';
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 700; color: ${badgeColor}; font-size: 14px;">#${index + 1}</span>
+                            <span style="color: var(--text-primary); font-weight: 500;">${p.name}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 600; color: var(--text-primary);">${formatCurrency(p.comm)}</div>
+                            <div style="font-size: 10px; color: var(--text-muted);">${p.dealsCount} İşlem</div>
+                        </div>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-weight: 600; color: var(--text-primary);">${formatCurrency(p.comm)}</div>
-                        <div style="font-size: 10px; color: var(--text-muted);">${p.dealsCount} İşlem</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
+        }
 
         // Render Chart.js
-        setTimeout(() => {
-            const ctx = container.querySelector('#revenue-chart').getContext('2d');
-            new Chart(ctx, {
+        const canvasEl = container.querySelector('#revenue-chart');
+        if (canvasEl) {
+            const ctx = canvasEl.getContext('2d');
+            if (revenueChart) {
+                revenueChart.destroy();
+            }
+            revenueChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: ['Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs'],
@@ -190,17 +217,17 @@ export async function renderReportsView(container) {
                     }
                 }
             });
-        }, 100);
+        }
 
     } catch (err) {
         console.error("Reports render error:", err);
-        // apiFetch redirection to #forbidden will handle the page redirection if status is 403.
-        // Otherwise, show standard error notice here.
-        loadingEl.innerHTML = `
-            <div style="color: #f87171; font-size: 14px;">
-                ⚠️ Rapor verileri yüklenirken bir hata oluştu: ${err.message}
-            </div>
-        `;
+        if (loadingEl) {
+            loadingEl.innerHTML = `
+                <div style="color: #f87171; font-size: 14px;">
+                    ⚠️ Rapor verileri yüklenirken bir hata oluştu: ${err.message}
+                </div>
+            `;
+        }
     }
 }
 

@@ -186,7 +186,7 @@ def roles_accepted(*requirements):
                 user_row = cursor.fetchone()
                 if user_row:
                     role = user_row['role'] or 'agent'
-                    if role in requirements:
+                    if role == 'admin' or role in requirements:
                         has_access = True
                     else:
                         cursor.execute('SELECT * FROM rol_yetkileri WHERE role = ?', (role,))
