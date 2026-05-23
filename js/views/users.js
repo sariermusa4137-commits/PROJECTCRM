@@ -1,9 +1,12 @@
 // PROJECTCRM - Danışman Kadrosu Görünümü (Users View)
 
-import { apiFetch } from '../store.js';
+import { state, apiFetch } from '../store.js';
 import { showToast } from '../components/ui.js';
 
 export async function renderUsersView(container) {
+    const activeUser = state.currentUser;
+    const isAdmin = activeUser && activeUser.role === 'admin';
+
     container.innerHTML = `
         <div class="view-header" style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 4px;">
             <h2 style="font-family:'Outfit', sans-serif; font-weight:700; font-size:24px; margin:0;">Danışman Kadrosu</h2>
@@ -19,12 +22,13 @@ export async function renderUsersView(container) {
                             <th>E-posta</th>
                             <th>Kayıt Tarihi</th>
                             <th>Ofis / Çalışma Alanı</th>
-                            <th>Rol</th>
+                            <th>Yetki Rolü</th>
+                            <th>Eylemler</th>
                         </tr>
                     </thead>
                     <tbody id="users-table-body">
                         <tr>
-                            <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                                 Yükleniyor...
                             </td>
                         </tr>
@@ -46,7 +50,7 @@ export async function renderUsersView(container) {
         if (users.length === 0) {
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                         Kayıtlı kullanıcı bulunamadı.
                     </td>
                 </tr>
@@ -63,7 +67,10 @@ export async function renderUsersView(container) {
             }) : '-';
             const office = user.agencyName || 'Bireysel';
             
-            const roleBadgeStyle = user.role === 'Yönetici' 
+            // Format role text and badge
+            const isUserAdmin = user.role === 'admin';
+            const roleLabel = isUserAdmin ? 'Yönetici (Admin)' : 'Danışman (Agent)';
+            const roleBadgeStyle = isUserAdmin 
                 ? 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;'
                 : 'background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
 
@@ -82,17 +89,57 @@ export async function renderUsersView(container) {
                     <td style="font-size: 13px; color: var(--text-secondary);">${dateStr}</td>
                     <td style="font-size: 13px; color: var(--text-secondary);">🏢 ${office}</td>
                     <td>
-                        <span style="${roleBadgeStyle}">${user.role}</span>
+                        <span style="${roleBadgeStyle}">${roleLabel}</span>
+                    </td>
+                    <td>
+                        <select class="role-select" data-uid="${user.uid}" ${isAdmin ? '' : 'disabled'} style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 6px 12px; color: var(--text-primary); font-size: 12px; cursor: ${isAdmin ? 'pointer' : 'not-allowed'}; min-width: 140px; outline: none; transition: all var(--transition-fast);">
+                            <option value="agent" ${!isUserAdmin ? 'selected' : ''}>Danışman (Agent)</option>
+                            <option value="admin" ${isUserAdmin ? 'selected' : ''}>Yönetici (Admin)</option>
+                        </select>
                     </td>
                 </tr>
             `;
         }).join('');
+
+        // Attach event listeners for role selection changes
+        const selects = container.querySelectorAll('.role-select');
+        selects.forEach(select => {
+            select.addEventListener('change', async (e) => {
+                const uid = select.getAttribute('data-uid');
+                const newRole = select.value;
+                
+                try {
+                    select.disabled = true;
+                    showToast("Rol güncelleniyor...", "info");
+                    
+                    const response = await apiFetch('/api/users/update-role', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: uid, newRole })
+                    });
+                    
+                    if (!response.ok) {
+                        const result = await response.json();
+                        throw new Error(result.error || "Rol değiştirilemedi.");
+                    }
+                    
+                    showToast("Kullanıcı rolü başarıyla güncellendi.", "success");
+                    // Refresh view to update the badge and state
+                    renderUsersView(container);
+                } catch (err) {
+                    console.error("Failed to update role:", err);
+                    showToast(err.message, "error");
+                    // Re-render view to revert UI state
+                    renderUsersView(container);
+                }
+            });
+        });
     } catch (err) {
         console.error(err);
         showToast("Kullanıcı listesi yüklenirken hata oluştu.", "error");
         tableBody.innerHTML = `
             <tr>
-                <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                     Yükleme başarısız.
                 </td>
             </tr>

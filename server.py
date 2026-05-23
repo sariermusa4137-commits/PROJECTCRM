@@ -354,7 +354,8 @@ def init_db():
             lastName TEXT,
             phone TEXT,
             password TEXT,
-            profile_image TEXT
+            profile_image TEXT,
+            role TEXT DEFAULT 'agent'
         )
     ''')
     
@@ -437,6 +438,7 @@ def init_db():
         ("users", "phone", "TEXT"),
         ("users", "password", "TEXT"),
         ("users", "profile_image", "TEXT"),
+        ("users", "role", "TEXT DEFAULT 'agent'"),
         ("customers", "birth_date", "TEXT")
     ]
     for table, col, col_type in alter_queries:
@@ -644,7 +646,13 @@ def init_db():
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (loc["id"], loc["name"], loc["notes"], loc["sqmPriceSale"], loc["sqmPriceRent"], loc["competitorNotes"], loc["demographics"], loc["trends"], loc["subNeighborhoods"], loc["createdAt"]))
             
-    conn.commit()
+    # Promote sariermusa4137@gmail.com to admin role
+    try:
+        cursor.execute("UPDATE users SET role = 'admin' WHERE email = 'sariermusa4137@gmail.com'")
+        conn.commit()
+    except Exception as e:
+        print(f"Error promoting admin: {e}", flush=True)
+        
     conn.close()
 
 # Initialize database on app startup (runs under Gunicorn and development server)
@@ -1270,7 +1278,7 @@ def get_users():
         
         cursor.execute('''
             SELECT u.uid, u.displayName, u.email, u.photoURL, u.agencyId, u.createdAt, 
-                   u.firstName, u.lastName, u.phone, u.profile_image, 
+                   u.firstName, u.lastName, u.phone, u.profile_image, u.role,
                    a.createdById as agencyOwnerId, a.name as agencyName
             FROM users u
             LEFT JOIN agencies a ON u.agencyId = a.id
@@ -1280,15 +1288,54 @@ def get_users():
         users_list = []
         for r in rows:
             item = dict(r)
-            # Determine role: if they are the creator of their agency, they are 'Yönetici', else 'Danışman'
+            # Default empty role to 'agent'
+            if not item.get('role'):
+                item['role'] = 'agent'
+            
+            # Keep agencyOwnerId to calculate if owner, but keep it clean
             is_owner = item.get('uid') == item.get('agencyOwnerId')
-            item['role'] = 'Yönetici' if is_owner else 'Danışman'
+            item['isAgencyOwner'] = is_owner
             if 'agencyOwnerId' in item:
                 del item['agencyOwnerId']
+                
             users_list.append(item)
             
         conn.close()
         return jsonify(users_list)
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/users/update-role', methods=['POST'])
+@login_required
+def update_user_role():
+    try:
+        current_user_id = session.get('user_id')
+        data = request.get_json() or {}
+        target_user_id = data.get('userId')
+        new_role = data.get('newRole')
+        
+        if not target_user_id or not new_role:
+            return {"error": "userId ve newRole alanları zorunludur."}, 400
+            
+        if new_role not in ['admin', 'agent']:
+            return {"error": "Geçersiz rol belirtildi."}, 400
+            
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verify if current user is admin
+        cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+        current_user = cursor.fetchone()
+        if not current_user or current_user['role'] != 'admin':
+            conn.close()
+            return {"error": "Yetkisiz işlem. Yalnızca yöneticiler rol değiştirebilir."}, 403
+            
+        # Update user role
+        cursor.execute('UPDATE users SET role = ? WHERE uid = ?', (new_role, target_user_id))
+        conn.commit()
+        conn.close()
+        
+        return {"success": True}
     except Exception as e:
         return {"error": str(e)}, 500
 
