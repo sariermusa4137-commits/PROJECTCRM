@@ -650,6 +650,21 @@ def init_db():
 # Initialize database on app startup (runs under Gunicorn and development server)
 with app.app_context():
     init_db()
+    # Temporary password reset migration hook
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        email_to_reset = 'sariermusa4137@gmail.com'
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email_to_reset,))
+        user = cursor.fetchone()
+        if user:
+            new_hash = generate_password_hash('123456', method='pbkdf2:sha256')
+            cursor.execute('UPDATE users SET password = ? WHERE email = ?', (new_hash, email_to_reset))
+            conn.commit()
+            print(f"Password reset migration executed for {email_to_reset}", flush=True)
+        conn.close()
+    except Exception as e:
+        print(f"Error in password reset migration: {e}", flush=True)
 
 @app.route('/api/auth/register', methods=['POST'])
 def auth_register():
