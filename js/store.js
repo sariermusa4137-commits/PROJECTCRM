@@ -86,7 +86,9 @@ export async function fetchAllData(agencyId) {
     }
 }
 
-// Start polling backend every 5 seconds for updates
+// Start polling backend every 15 seconds for updates
+// 15s aralık, 5s'ye kıyasla sunucu yükünü 3x azaltır;
+// değişim bazlı guard (JSON.stringify karşılaştırması) gereksiz render'ları zaten engelliyor.
 export function startPolling() {
     if (pollingInterval) clearInterval(pollingInterval);
     pollingInterval = setInterval(async () => {
@@ -97,7 +99,7 @@ export function startPolling() {
                 console.error("Senkronizasyon hatası (polling):", e);
             }
         }
-    }, 5000);
+    }, 15000);
 }
 
 // Stop polling backend
@@ -408,9 +410,10 @@ export async function deleteRecord(collectionName, id) {
 
 export function canViewPhone(record) {
     if (!state.currentUser) return false;
-    const email = (state.currentUser.email || "").toLowerCase();
-    const isAdmin = email.includes("admin") || email === "musa@danisman.com";
-    if (isAdmin) return true;
+    // Rol tablosuna dayalı kontrol — email string eşleştirmesi yerine güvenilir yöntem
+    const role = (state.currentUser.role || 'agent').toLowerCase();
+    if (role === 'admin') return true;
+    // Kendi oluşturduğu kayıtlar için de görebilir
     if (record && record.createdById === state.currentUser.uid) return true;
     return false;
 }

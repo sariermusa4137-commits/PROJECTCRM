@@ -7,6 +7,7 @@ Thumbs.db
 
 # Python
 __pycache__/
+routes/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -14,6 +15,9 @@ __pycache__/
 env/
 venv/
 ENV/
+
+# Test files
+*.cookie
 
 # Local configuration
 .env
