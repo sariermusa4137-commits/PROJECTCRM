@@ -653,6 +653,8 @@ def init_db():
             aciliyet_durumu TEXT,
             sozlesme_tipi TEXT,
             sozlesme_bitis_tarihi TEXT,
+            contract_end_date TEXT,
+            property_sold_date TEXT,
             mulk_durumu TEXT,
             tapu_durumu_notlari TEXT
         )
@@ -666,7 +668,9 @@ def init_db():
         ("users", "password", "TEXT"),
         ("users", "profile_image", "TEXT"),
         ("users", "role", "TEXT DEFAULT 'agent'"),
-        ("customers", "birth_date", "TEXT")
+        ("customers", "birth_date", "TEXT"),
+        ("customers", "contract_end_date", "TEXT"),
+        ("customers", "property_sold_date", "TEXT")
     ]
     for table, col, col_type in alter_queries:
         try:
@@ -1333,6 +1337,11 @@ def create_data_record(collection):
                 data['birth_date'] = data['birthDate']
             elif 'birth_date' in data and 'birthDate' not in data:
                 data['birthDate'] = data['birth_date']
+            
+            if 'sozlesme_bitis_tarihi' in data and 'contract_end_date' not in data:
+                data['contract_end_date'] = data['sozlesme_bitis_tarihi']
+            elif 'contract_end_date' in data and 'sozlesme_bitis_tarihi' not in data:
+                data['sozlesme_bitis_tarihi'] = data['contract_end_date']
         
         allowed_collections = ['portfolios', 'customers', 'meetings', 'todos', 'activities', 'deals']
         if collection not in allowed_collections:
@@ -1398,6 +1407,11 @@ def update_data_record(collection, id):
                 data['birth_date'] = data['birthDate']
             elif 'birth_date' in data and 'birthDate' not in data:
                 data['birthDate'] = data['birth_date']
+            
+            if 'sozlesme_bitis_tarihi' in data and 'contract_end_date' not in data:
+                data['contract_end_date'] = data['sozlesme_bitis_tarihi']
+            elif 'contract_end_date' in data and 'sozlesme_bitis_tarihi' not in data:
+                data['sozlesme_bitis_tarihi'] = data['contract_end_date']
         
         allowed_collections = ['portfolios', 'customers', 'meetings', 'todos', 'activities', 'deals']
         if collection not in allowed_collections:
@@ -1797,6 +1811,155 @@ def get_ciro_report():
         })
     except Exception as e:
         return {"error": str(e)}, 500
+
+@app.route('/api/calendar-events', methods=['GET'])
+@login_required
+def get_calendar_events():
+    try:
+        current_user_id = session.get('user_id')
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Get user info
+        cursor.execute('SELECT role, agencyId FROM users WHERE uid = ?', (current_user_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            conn.close()
+            return {"error": "Kullanıcı bulunamadı."}, 404
+            
+        role = user_row['role'] or 'agent'
+        agency_id = user_row['agencyId']
+        
+        # Get customers
+        if role == 'admin':
+            if agency_id:
+                cursor.execute('SELECT * FROM customers WHERE agencyId = ?', (agency_id,))
+            else:
+                cursor.execute('SELECT * FROM customers')
+        else:
+            if agency_id:
+                cursor.execute('SELECT * FROM customers WHERE agencyId = ? AND createdById = ?', (agency_id, current_user_id))
+            else:
+                cursor.execute('SELECT * FROM customers WHERE createdById = ?', (current_user_id,))
+                
+        customers = cursor.fetchall()
+        
+        # Get ordinary meetings
+        if role == 'admin':
+            if agency_id:
+                cursor.execute('SELECT * FROM meetings WHERE agencyId = ?', (agency_id,))
+            else:
+                cursor.execute('SELECT * FROM meetings')
+        else:
+            if agency_id:
+                cursor.execute('SELECT * FROM meetings WHERE agencyId = ? AND createdById = ?', (agency_id, current_user_id))
+            else:
+                cursor.execute('SELECT * FROM meetings WHERE createdById = ?', (current_user_id,))
+                
+        meetings = cursor.fetchall()
+        conn.close()
+        
+        events = []
+        
+        # Add ordinary meetings
+        for m in meetings:
+            events.append({
+                "id": str(m['id']),
+                "title": m['title'],
+                "start": m['date'],
+                "time": m['time'] or "00:00",
+                "type": m['type'] or "Görüşme",
+                "customerName": m['customerName'] or "",
+                "notes": m['notes'] or "",
+                "kanbanStage": m['kanbanStage'] or "İlk Temas"
+            })
+            
+        current_year = 2026
+        
+        # Process customers for critical dates
+        for c in customers:
+            c_dict = dict(c)
+            c_id = c_dict['id']
+            c_name = c_dict['name']
+            c_phone = c_dict.get('phone') or ""
+            
+            # 1. Birth Date (doğum günü)
+            b_date = c_dict.get('birth_date') or c_dict.get('birthDate')
+            if b_date:
+                try:
+                    parts = b_date.split('-')
+                    if len(parts) == 3:
+                        month = parts[1]
+                        day = parts[2]
+                        adjusted_start = f"{current_year}-{month}-{day}"
+                        events.append({
+                            "id": f"bday_{c_id}",
+                            "title": f"🎂 Doğum Günü: {c_name}",
+                            "start": adjusted_start,
+                            "backgroundColor": "#ffccd5",
+                            "textColor": "#c9184a",
+                            "allDay": True,
+                            "type": "Doğum Günü",
+                            "customerName": c_name,
+                            "phone": c_phone
+                        })
+                except Exception as e:
+                    print(f"Error parsing birth date for customer {c_id}: {e}", flush=True)
+                    
+            # 2. Contract End Date (sözleşme bitişi)
+            c_end = c_dict.get('contract_end_date') or c_dict.get('sozlesme_bitis_tarihi')
+            if c_end:
+                events.append({
+                    "id": f"contract_{c_id}",
+                    "title": f"📜 Sözleşme Bitişi: {c_name}",
+                    "start": c_end,
+                    "backgroundColor": "#fff3cd",
+                    "textColor": "#856404",
+                    "allDay": True,
+                    "type": "Sözleşme Bitişi",
+                    "customerName": c_name,
+                    "phone": c_phone
+                })
+                
+            # 3. Property Sold Date (mülk yıldönümü)
+            sold_date = c_dict.get('property_sold_date')
+            if sold_date:
+                try:
+                    parts = sold_date.split('-')
+                    if len(parts) == 3:
+                        sold_year = int(parts[0])
+                        month = parts[1]
+                        day = parts[2]
+                        years_diff = current_year - sold_year
+                        if years_diff > 0:
+                            adjusted_start = f"{current_year}-{month}-{day}"
+                            events.append({
+                                "id": f"anniv_{c_id}",
+                                "title": f"🏠 {years_diff}. Mülk Yıldönümü: {c_name}",
+                                "start": adjusted_start,
+                                "backgroundColor": "#e2ece9",
+                                "textColor": "#0f5132",
+                                "allDay": True,
+                                "type": "Mülk Yıldönümü",
+                                "customerName": c_name,
+                                "phone": c_phone
+                            })
+                except Exception as e:
+                    print(f"Error parsing property sold date for customer {c_id}: {e}", flush=True)
+                    
+        return jsonify(events)
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/customers', methods=['POST'])
+@login_required
+def create_customer_alias():
+    return create_data_record('customers')
+
+@app.route('/api/customers/<id>', methods=['PUT'])
+@login_required
+def update_customer_alias(id):
+    return update_data_record('customers', id)
 
 if __name__ == '__main__':
     init_db()

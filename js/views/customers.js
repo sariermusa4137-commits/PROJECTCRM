@@ -593,7 +593,7 @@ function openAddCustomerModal() {
                     <input type="email" id="c-email" placeholder="Örn: name@example.com">
                 </div>
                 <div class="form-group">
-                    <label for="c-birth">Doğum Tarihi (Hatırlatmalar için)</label>
+                    <label for="c-birth">Doğum Tarihi</label>
                     <input type="date" id="c-birth">
                 </div>
             </div>
@@ -693,9 +693,15 @@ function openAddCustomerModal() {
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="c-tapu-notlari">Tapu Durumu Notları</label>
-                    <textarea id="c-tapu-notlari" placeholder="İpotek, Şerh, Hisseli vb. için açıklamalar..." style="min-height:60px;"></textarea>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="c-property-sold">Mülk Satış Tarihi</label>
+                        <input type="date" id="c-property-sold">
+                    </div>
+                    <div class="form-group">
+                        <label for="c-tapu-notlari">Tapu Durumu Notları</label>
+                        <textarea id="c-tapu-notlari" placeholder="İpotek, Şerh, Hisseli vb. için açıklamalar..." style="min-height:40px;"></textarea>
+                    </div>
                 </div>
             </div>
             
@@ -744,6 +750,7 @@ function openAddCustomerModal() {
             phone: document.getElementById('c-phone').value.trim(),
             email: document.getElementById('c-email').value.trim(),
             birthDate: document.getElementById('c-birth').value,
+            birth_date: document.getElementById('c-birth').value,
             type: type,
             budget: type === 'Alıcı' ? (Number(document.getElementById('c-budget').value) || 0) : 0,
             searchPropertyType: type === 'Alıcı' ? document.getElementById('c-prop-type').value : "",
@@ -760,6 +767,8 @@ function openAddCustomerModal() {
             
             sozlesme_tipi: type === 'Satıcı' ? document.getElementById('c-sozlesme-tipi').value : "",
             sozlesme_bitis_tarihi: type === 'Satıcı' ? document.getElementById('c-sozlesme-bitis').value : "",
+            contract_end_date: type === 'Satıcı' ? document.getElementById('c-sozlesme-bitis').value : "",
+            property_sold_date: type === 'Satıcı' ? document.getElementById('c-property-sold').value : "",
             mulk_durumu: type === 'Satıcı' ? document.getElementById('c-mulk-durumu').value : "",
             tapu_durumu_notlari: type === 'Satıcı' ? document.getElementById('c-tapu-notlari').value.trim() : ""
         };
@@ -797,7 +806,7 @@ function openEditCustomerModal(c) {
                 </div>
                 <div class="form-group">
                     <label for="ce-birth">Doğum Tarihi</label>
-                    <input type="date" id="ce-birth" value="${c.birthDate || ''}">
+                    <input type="date" id="ce-birth" value="${c.birth_date || c.birthDate || ''}">
                 </div>
             </div>
             
@@ -896,9 +905,15 @@ function openEditCustomerModal(c) {
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="ce-tapu-notlari">Tapu Durumu Notları</label>
-                    <textarea id="ce-tapu-notlari" placeholder="İpotek, Şerh, Hisseli vb. için açıklamalar..." style="min-height:60px;">${c.tapu_durumu_notlari || ''}</textarea>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="ce-property-sold">Mülk Satış Tarihi</label>
+                        <input type="date" id="ce-property-sold" value="${c.property_sold_date || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="ce-tapu-notlari">Tapu Durumu Notları</label>
+                        <textarea id="ce-tapu-notlari" placeholder="İpotek, Şerh, Hisseli vb. için açıklamalar..." style="min-height:40px;">${c.tapu_durumu_notlari || ''}</textarea>
+                    </div>
                 </div>
             </div>
             
@@ -946,6 +961,7 @@ function openEditCustomerModal(c) {
             phone: document.getElementById('ce-phone').value.trim(),
             email: document.getElementById('ce-email').value.trim(),
             birthDate: document.getElementById('ce-birth').value,
+            birth_date: document.getElementById('ce-birth').value,
             type: type,
             budget: type === 'Alıcı' ? (Number(document.getElementById('ce-budget').value) || 0) : 0,
             searchPropertyType: type === 'Alıcı' ? document.getElementById('ce-prop-type').value : "",
@@ -962,6 +978,8 @@ function openEditCustomerModal(c) {
             
             sozlesme_tipi: type === 'Satıcı' ? document.getElementById('ce-sozlesme-tipi').value : "",
             sozlesme_bitis_tarihi: type === 'Satıcı' ? document.getElementById('ce-sozlesme-bitis').value : "",
+            contract_end_date: type === 'Satıcı' ? document.getElementById('ce-sozlesme-bitis').value : "",
+            property_sold_date: type === 'Satıcı' ? document.getElementById('ce-property-sold').value : "",
             mulk_durumu: type === 'Satıcı' ? document.getElementById('ce-mulk-durumu').value : "",
             tapu_durumu_notlari: type === 'Satıcı' ? document.getElementById('ce-tapu-notlari').value.trim() : ""
         };

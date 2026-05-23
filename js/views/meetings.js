@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Görüşmeler, Takvim ve Kanban Süreç Panosu Görünümü
 
-import { state, addRecord, updateRecord, deleteRecord } from '../store.js';
+import { state, addRecord, updateRecord, deleteRecord, apiFetch } from '../store.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
 let currentYear = new Date().getFullYear();
@@ -147,9 +147,20 @@ function setupDragAndDrop() {
 }
 
 // ----------------- CALENDAR VIEW -----------------
-function renderCalendar() {
+async function renderCalendar() {
     const container = document.getElementById('calendar-view-container');
     if (!container) return;
+    
+    // Fetch calendar events
+    let events = [];
+    try {
+        const res = await apiFetch('/api/calendar-events');
+        if (res.ok) {
+            events = await res.json();
+        }
+    } catch (err) {
+        console.error("Takvim verileri yüklenemedi:", err);
+    }
     
     const months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
     
@@ -195,18 +206,36 @@ function renderCalendar() {
         
         const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
-        // Filter meetings on this date
-        const dayMeetings = state.meetings.filter(m => m.date === dateStr);
+        // Filter events on this date
+        const dayEvents = events.filter(e => e.start === dateStr);
         
         dayCell.innerHTML = `
             <span class="calendar-day-num">${day}</span>
             <div class="calendar-day-events">
-                ${dayMeetings.map(m => {
-                    const isBirthday = m.type === 'Doğum Günü';
-                    const displayText = isBirthday ? `🎂 Doğum Günü: ${m.customerName}` : `${m.time} ${m.customerName}`;
-                    const cleanClass = m.type.toLowerCase().replace(/\s+/g, '-').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ı/g,'i').replace(/ğ/g,'g');
+                ${dayEvents.map(e => {
+                    const isBirthday = e.type === 'Doğum Günü';
+                    const isContract = e.type === 'Sözleşme Bitişi';
+                    const isAnniv = e.type === 'Mülk Yıldönümü';
+                    
+                    let displayText = e.title;
+                    if (!isBirthday && !isContract && !isAnniv && e.time) {
+                        displayText = `${e.time} ${e.customerName}`;
+                    }
+                    
+                    let cleanClass = 'gorusme';
+                    if (isBirthday) cleanClass = 'dogum-gunu';
+                    else if (isContract) cleanClass = 'sozlesme-bitisi';
+                    else if (isAnniv) cleanClass = 'mulk-yildonumu';
+                    else if (e.type) {
+                        cleanClass = e.type.toLowerCase().replace(/\s+/g, '-').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ı/g,'i').replace(/ğ/g,'g');
+                    }
+                    
+                    const styleAttr = (e.backgroundColor && e.textColor) 
+                        ? `style="background: ${e.backgroundColor}; color: ${e.textColor}; border: 1px solid rgba(255,255,255,0.05);"`
+                        : '';
+                    
                     return `
-                        <span class="calendar-event-pill ${cleanClass}" data-id="${m.id}" title="${displayText}">
+                        <span class="calendar-event-pill ${cleanClass}" data-id="${e.id}" ${styleAttr} title="${e.title}">
                             ${displayText}
                         </span>
                     `;
@@ -214,13 +243,15 @@ function renderCalendar() {
             </div>
         `;
         
-        // Click to add meeting on this day
-        dayCell.addEventListener('click', (e) => {
-            // If target is a meeting pill, handle that instead
-            if (e.target.classList.contains('calendar-event-pill')) {
-                e.stopPropagation();
-                const m = state.meetings.find(item => item.id === e.target.dataset.id);
-                if (m) openMeetingDetailModal(m);
+        // Click handler for day cell/event pill
+        dayCell.addEventListener('click', (ev) => {
+            if (ev.target.classList.contains('calendar-event-pill')) {
+                ev.stopPropagation();
+                const eventId = ev.target.dataset.id;
+                const clickedEvent = events.find(item => item.id === eventId);
+                if (clickedEvent) {
+                    handleEventClick(clickedEvent);
+                }
             } else {
                 openAddMeetingModal(dateStr);
             }
@@ -247,6 +278,60 @@ function renderCalendar() {
         }
         renderCalendar();
     });
+}
+
+function handleEventClick(e) {
+    if (e.type === 'Doğum Günü') {
+        const content = `
+            <div style="text-align: center; padding: 12px 0;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🎂</div>
+                <h3 style="font-family:'Outfit', sans-serif; font-weight:600; margin-bottom:8px;">Bugün ${e.customerName} kişisinin doğum günü!</h3>
+                <p style="color:var(--text-secondary); font-size:14px; margin-bottom:24px;">Müşterinizi tebrik etmek ve onunla iletişimde kalmak için harika bir fırsat!</p>
+                
+                ${e.phone ? `
+                <a href="tel:${e.phone}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:10px 20px; font-weight:600; font-size:13px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px; height:16px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    Aramak İçin Tıklayın (${e.phone})
+                </a>
+                ` : '<p style="color:var(--text-muted); font-size:12px;">Kayıtlı telefon numarası bulunmamaktadır.</p>'}
+            </div>
+        `;
+        openModal("Doğum Günü Kutlaması", content);
+    } else if (e.type === 'Sözleşme Bitişi') {
+        const content = `
+            <div style="text-align: center; padding: 12px 0;">
+                <div style="font-size: 48px; margin-bottom: 16px;">📜</div>
+                <h3 style="font-family:'Outfit', sans-serif; font-weight:600; color:#e0a82e; margin-bottom:8px;">Kritik Uyarı: Sözleşme Süresi Doluyor!</h3>
+                <p style="color:var(--text-secondary); font-size:14px; margin-bottom:24px;">Bu portföyün sözleşme süresi doluyor. Müşteriniz <strong>${e.customerName}</strong> ile yenileme görüşmesi yapın.</p>
+                
+                ${e.phone ? `
+                <a href="tel:${e.phone}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:10px 20px; font-weight:600; font-size:13px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px; height:16px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    Müşteriyi Ara (${e.phone})
+                </a>
+                ` : ''}
+            </div>
+        `;
+        openModal("Sözleşme Bitiş Hatırlatıcısı", content);
+    } else if (e.type === 'Mülk Yıldönümü') {
+        const content = `
+            <div style="text-align: center; padding: 12px 0;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🏠</div>
+                <h3 style="font-family:'Outfit', sans-serif; font-weight:600; color:#2e7d32; margin-bottom:8px;">Mülk Edindirme Yıldönümü!</h3>
+                <p style="color:var(--text-secondary); font-size:14px; margin-bottom:24px;">Bugün müşteriniz <strong>${e.customerName}</strong> kişisinin mülk alımının yıldönümü. İlişkileri tazelemek için arayabilirsiniz.</p>
+                
+                ${e.phone ? `
+                <a href="tel:${e.phone}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:10px 20px; font-weight:600; font-size:13px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px; height:16px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    Müşteriyi Ara (${e.phone})
+                </a>
+                ` : ''}
+            </div>
+        `;
+        openModal("Mülk Yıldönümü Kutlaması", content);
+    } else {
+        openMeetingDetailModal(e);
+    }
 }
 
 // ----------------- MODAL DETAILS & CRUD -----------------
