@@ -44,15 +44,15 @@ def get_matchmaking_opportunities():
             role = (user_row['role'] if user_row else None) or 'agent'
 
             # Portföyleri al (Aktif durumdakiler)
-            cursor.execute("SELECT * FROM portfolios WHERE agencyId = ? AND status = 'Aktif'", (agency_id,))
+            cursor.execute("SELECT * FROM portfolios WHERE agencyId = ? AND LOWER(status) = 'aktif'", (agency_id,))
             portfolios = [dict(r) for r in cursor.fetchall()]
 
-            # Müşterileri al (Alıcı tipindekiler)
+            # Müşterileri al (Alıcı tipindekiler ve durumu aktif olanlar)
             # Admin tüm acentenin müşterilerini, Agent/diğer roller sadece kendi müşterilerini görür
             if role == 'admin':
-                cursor.execute("SELECT * FROM customers WHERE agencyId = ? AND type = 'Alıcı'", (agency_id,))
+                cursor.execute("SELECT * FROM customers WHERE agencyId = ? AND type = 'Alıcı' AND LOWER(status) = 'aktif'", (agency_id,))
             else:
-                cursor.execute("SELECT * FROM customers WHERE agencyId = ? AND type = 'Alıcı' AND createdById = ?", (agency_id, current_user_id))
+                cursor.execute("SELECT * FROM customers WHERE agencyId = ? AND type = 'Alıcı' AND LOWER(status) = 'aktif' AND createdById = ?", (agency_id, current_user_id))
             
             customers = [dict(r) for r in cursor.fetchall()]
 

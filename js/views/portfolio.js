@@ -7,7 +7,7 @@ import { openModal, closeModal, showToast } from '../components/ui.js';
 let activeFilters = {
     search: '',
     type: 'Hepsi',
-    status: 'Aktif'
+    status: 'aktif'
 };
 
 let tempCoordinates = { lat: 40.9800, lng: 29.0800 };
@@ -54,9 +54,10 @@ export function renderPortfolioView(container) {
                 <label for="filter-status">İlan Durumu</label>
                 <select id="filter-status">
                     <option value="Hepsi" ${activeFilters.status === 'Hepsi' ? 'selected' : ''}>Tüm İlanlar</option>
-                    <option value="Aktif" ${activeFilters.status === 'Aktif' ? 'selected' : ''}>Aktif</option>
-                    <option value="Rezerve" ${activeFilters.status === 'Rezerve' ? 'selected' : ''}>Rezerve</option>
-                    <option value="Satıldı" ${activeFilters.status === 'Satıldı' ? 'selected' : ''}>Satıldı / Kiralandı</option>
+                    <option value="aktif" ${activeFilters.status === 'aktif' ? 'selected' : ''}>Aktif</option>
+                    <option value="beklemede" ${activeFilters.status === 'beklemede' ? 'selected' : ''}>Beklemede</option>
+                    <option value="iptal" ${activeFilters.status === 'iptal' ? 'selected' : ''}>İptal</option>
+                    <option value="satildi" ${activeFilters.status === 'satildi' ? 'selected' : ''}>Satıldı / Kiralandı</option>
                 </select>
             </div>
         </div>
@@ -154,6 +155,16 @@ export function renderPortfolioView(container) {
     });
 }
 
+function getPortfolioStatusLabel(status) {
+    const labels = {
+        'aktif': 'Aktif',
+        'beklemede': 'Beklemede',
+        'iptal': 'İptal',
+        'satildi': 'Satıldı'
+    };
+    return labels[(status || 'aktif').toLowerCase()] || (status || 'Aktif');
+}
+
 // Filter and render list + map markers
 function updatePortfolioList() {
     const listContainer = document.getElementById('portfolio-list-container');
@@ -162,21 +173,18 @@ function updatePortfolioList() {
     // Apply filters
     const filtered = state.portfolios.filter(p => {
         // Search filter
-        const matchSearch = p.title.toLowerCase().includes(activeFilters.search.toLowerCase()) ||
+        const matchSearch = !activeFilters.search || 
+                            p.title.toLowerCase().includes(activeFilters.search.toLowerCase()) ||
                             p.district.toLowerCase().includes(activeFilters.search.toLowerCase()) ||
-                            p.createdByName.toLowerCase().includes(activeFilters.search.toLowerCase());
+                            p.neighborhood.toLowerCase().includes(activeFilters.search.toLowerCase());
         
         // Type filter
         const matchType = activeFilters.type === 'Hepsi' || p.type === activeFilters.type;
         
         // Status filter
         let matchStatus = true;
-        if (activeFilters.status === 'Aktif') {
-            matchStatus = p.status === 'Aktif';
-        } else if (activeFilters.status === 'Rezerve') {
-            matchStatus = p.status === 'Rezerve';
-        } else if (activeFilters.status === 'Satıldı') {
-            matchStatus = p.status === 'Satıldı' || p.status === 'Kiralandı';
+        if (activeFilters.status !== 'Hepsi') {
+            matchStatus = (p.status || 'aktif').toLowerCase() === activeFilters.status.toLowerCase();
         }
         
         return matchSearch && matchType && matchStatus;
@@ -184,9 +192,8 @@ function updatePortfolioList() {
     
     if (filtered.length === 0) {
         listContainer.innerHTML = `
-            <div class="empty-state" style="margin:20px 0;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="empty-icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <h3>Portföy Bulunamadı</h3>
+            <div style="grid-column:1/-1; text-align:center; padding:80px 40px; color:var(--text-muted);">
+                <div style="font-size:48px; margin-bottom:16px;">🏠</div>
                 <p>Arama veya filtre kriterlerinize uyan gayrimenkul kaydı bulunmamaktadır.</p>
             </div>
         `;
@@ -222,7 +229,7 @@ function updatePortfolioList() {
                             <img src="${p.createdByPhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=60'}" class="agent-avatar" alt="Profil">
                             <span>${p.createdByName}</span>
                         </div>
-                        <span class="status-badge ${p.status.toLowerCase()}">${p.status}</span>
+                        <span class="status-badge ${(p.status || 'aktif').toLowerCase()}">${getPortfolioStatusLabel(p.status)}</span>
                     </div>
                 </div>
             </div>
@@ -535,8 +542,10 @@ function openAddPortfolioModal() {
                 <div class="form-group">
                     <label for="p-status">İlan Durumu</label>
                     <select id="p-status">
-                        <option value="Aktif">Aktif</option>
-                        <option value="Rezerve">Rezerve</option>
+                        <option value="aktif">Aktif</option>
+                        <option value="beklemede">Beklemede</option>
+                        <option value="iptal">İptal</option>
+                        <option value="satildi">Satıldı</option>
                     </select>
                 </div>
             </div>
@@ -739,9 +748,10 @@ function openEditPortfolioModal(p) {
                 <div class="form-group">
                     <label for="pe-status">İlan Durumu</label>
                     <select id="pe-status">
-                        <option value="Aktif" ${p.status === 'Aktif' ? 'selected' : ''}>Aktif</option>
-                        <option value="Rezerve" ${p.status === 'Rezerve' ? 'selected' : ''}>Rezerve</option>
-                        <option value="Satıldı" ${p.status === 'Satıldı' || p.status === 'Kiralandı' ? 'selected' : ''}>Satıldı / Kiralandı</option>
+                        <option value="aktif" ${(p.status || 'aktif').toLowerCase() === 'aktif' ? 'selected' : ''}>Aktif</option>
+                        <option value="beklemede" ${(p.status || '').toLowerCase() === 'beklemede' ? 'selected' : ''}>Beklemede</option>
+                        <option value="iptal" ${(p.status || '').toLowerCase() === 'iptal' ? 'selected' : ''}>İptal</option>
+                        <option value="satildi" ${(p.status || '').toLowerCase() === 'satildi' ? 'selected' : ''}>Satıldı</option>
                     </select>
                 </div>
             </div>

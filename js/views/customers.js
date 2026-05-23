@@ -44,6 +44,7 @@ export function renderCustomersView(container) {
                             <th>Müşteri Adı</th>
                             <th>Telefon</th>
                             <th>Müşteri Tipi</th>
+                            <th>Durum</th>
                             <th>Bütçe</th>
                             <th>Arayış / Kriterler</th>
                             <th>Sorumlu Danışman</th>
@@ -125,6 +126,16 @@ export function renderCustomersView(container) {
     });
 }
 
+function getStatusLabel(status) {
+    const labels = {
+        'aktif': 'Aktif',
+        'askiya_alindi': 'Askıya Alındı',
+        'vazgecti': 'Vazgeçti',
+        'tamamlandi': 'Tamamlandı'
+    };
+    return labels[(status || 'aktif').toLowerCase()] || (status || 'Aktif');
+}
+
 function updateCustomerTable() {
     const tableBody = document.getElementById('customer-table-body');
     if (!tableBody) return;
@@ -139,7 +150,7 @@ function updateCustomerTable() {
     if (filtered.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">
+                <td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">
                     Kayıtlı müşteri bulunmamaktadır.
                 </td>
             </tr>
@@ -166,6 +177,11 @@ function updateCustomerTable() {
                 <td>
                     <span class="portfolio-type-badge ${c.type === 'Alıcı' ? 'satilik' : 'kiralik'}">
                         ${c.type}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-badge ${(c.status || 'aktif').toLowerCase()}">
+                        ${getStatusLabel(c.status)}
                     </span>
                 </td>
                 <td style="color:var(--secondary); font-weight:600;">${formatBudget}</td>
@@ -596,6 +612,15 @@ function openAddCustomerModal() {
                     <label for="c-birth">Doğum Tarihi</label>
                     <input type="date" id="c-birth">
                 </div>
+                <div class="form-group">
+                    <label for="c-status">Müşteri Durumu</label>
+                    <select id="c-status">
+                        <option value="aktif">Aktif</option>
+                        <option value="askiya_alindi">Askıya Alındı</option>
+                        <option value="vazgecti">Vazgeçti</option>
+                        <option value="tamamlandi">Tamamlandı</option>
+                    </select>
+                </div>
             </div>
             
             <div class="form-group-three">
@@ -752,6 +777,7 @@ function openAddCustomerModal() {
             birthDate: document.getElementById('c-birth').value,
             birth_date: document.getElementById('c-birth').value,
             type: type,
+            status: document.getElementById('c-status').value,
             budget: type === 'Alıcı' ? (Number(document.getElementById('c-budget').value) || 0) : 0,
             searchPropertyType: type === 'Alıcı' ? document.getElementById('c-prop-type').value : "",
             searchRooms: type === 'Alıcı' ? document.getElementById('c-rooms').value.trim() : "",
@@ -807,6 +833,15 @@ function openEditCustomerModal(c) {
                 <div class="form-group">
                     <label for="ce-birth">Doğum Tarihi</label>
                     <input type="date" id="ce-birth" value="${c.birth_date || c.birthDate || ''}">
+                </div>
+                <div class="form-group">
+                    <label for="ce-status">Müşteri Durumu</label>
+                    <select id="ce-status">
+                        <option value="aktif" ${(c.status || 'aktif') === 'aktif' ? 'selected' : ''}>Aktif</option>
+                        <option value="askiya_alindi" ${c.status === 'askiya_alindi' ? 'selected' : ''}>Askıya Alındı</option>
+                        <option value="vazgecti" ${c.status === 'vazgecti' ? 'selected' : ''}>Vazgeçti</option>
+                        <option value="tamamlandi" ${c.status === 'tamamlandi' ? 'selected' : ''}>Tamamlandı</option>
+                    </select>
                 </div>
             </div>
             
@@ -963,6 +998,7 @@ function openEditCustomerModal(c) {
             birthDate: document.getElementById('ce-birth').value,
             birth_date: document.getElementById('ce-birth').value,
             type: type,
+            status: document.getElementById('ce-status').value,
             budget: type === 'Alıcı' ? (Number(document.getElementById('ce-budget').value) || 0) : 0,
             searchPropertyType: type === 'Alıcı' ? document.getElementById('ce-prop-type').value : "",
             searchRooms: type === 'Alıcı' ? document.getElementById('ce-rooms').value.trim() : "",

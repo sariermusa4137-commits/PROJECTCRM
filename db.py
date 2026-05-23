@@ -101,7 +101,7 @@ def init_db():
                 neighborhood TEXT,
                 latitude REAL,
                 longitude REAL,
-                status TEXT,
+                status TEXT DEFAULT 'aktif',
                 heating TEXT,
                 age INTEGER,
                 floors INTEGER,
@@ -143,7 +143,8 @@ def init_db():
                 contract_end_date TEXT,
                 property_sold_date TEXT,
                 mulk_durumu TEXT,
-                tapu_durumu_notlari TEXT
+                tapu_durumu_notlari TEXT,
+                status TEXT DEFAULT 'aktif'
             )
         ''')
 
@@ -236,12 +237,21 @@ def init_db():
             ("customers", "birth_date", "TEXT"),
             ("customers", "contract_end_date", "TEXT"),
             ("customers", "property_sold_date", "TEXT"),
+            ("customers", "status", "TEXT DEFAULT 'aktif'"),
+            ("portfolios", "status", "TEXT DEFAULT 'aktif'"),
         ]
         for table, col, col_type in alter_queries:
             try:
                 cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
             except sqlite3.OperationalError:
                 pass  # Kolon zaten var
+
+        # Set default values for empty statuses
+        try:
+            cursor.execute("UPDATE portfolios SET status = 'aktif' WHERE status IS NULL OR status = ''")
+            cursor.execute("UPDATE customers SET status = 'aktif' WHERE status IS NULL OR status = ''")
+        except sqlite3.OperationalError:
+            pass
 
         # ------------------------------------------------------------------ #
         # Mevcut kullanıcılar için firstName/lastName migration               #

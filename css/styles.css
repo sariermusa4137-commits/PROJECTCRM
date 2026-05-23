@@ -1225,13 +1225,36 @@ textarea {
 }
 
 .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
     font-size: 11px;
     font-weight: 600;
+    text-align: center;
 }
 
-.status-badge.aktif { color: var(--secondary); }
-.status-badge.rezerve { color: var(--warning); }
-.status-badge.satildi { color: var(--text-muted); text-decoration: line-through; }
+.status-badge.aktif {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.status-badge.askiya_alindi,
+.status-badge.beklemede {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.status-badge.vazgecti,
+.status-badge.iptal {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.status-badge.satildi,
+.status-badge.tamamlandi {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+}
 
 /* Map View Pane */
 .map-pane {
