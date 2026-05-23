@@ -658,7 +658,7 @@ with app.app_context():
         cursor.execute('SELECT * FROM users WHERE email = ?', (email_to_reset,))
         user = cursor.fetchone()
         if user:
-            new_hash = generate_password_hash('123456', method='pbkdf2:sha256')
+            new_hash = generate_password_hash('41374137', method='pbkdf2:sha256')
             cursor.execute('UPDATE users SET password = ? WHERE email = ?', (new_hash, email_to_reset))
             conn.commit()
             print(f"Password reset migration executed for {email_to_reset}", flush=True)
