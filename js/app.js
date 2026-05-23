@@ -264,7 +264,7 @@ function isUserTyping() {
 
 // Handler triggered whenever store state updates (real-time Firebase updates)
 function handleStateChange() {
-    const isAuthenticated = !!(state.currentUser && state.currentUser.agencyId);
+    const isAuthenticated = !!state.currentUser;
     
     // Update User Profile details in Sidebar
     if (isAuthenticated && state.currentUser) {

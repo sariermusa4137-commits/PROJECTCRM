@@ -3,9 +3,180 @@
 import { state, apiFetch } from '../store.js';
 import { showToast } from '../components/ui.js';
 
+export async function updateUsersTable(container) {
+    const tableBody = container.querySelector('#users-table-body');
+    if (!tableBody) return;
+
+    try {
+        const res = await apiFetch('/api/users');
+        if (!res.ok) {
+            throw new Error("Kullanıcı listesi alınamadı.");
+        }
+        const users = await res.json();
+
+        if (users.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        Kayıtlı kullanıcı bulunamadı.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const activeUser = state.currentUser;
+        const isAdmin = activeUser && activeUser.role === 'admin';
+
+        tableBody.innerHTML = users.map(user => {
+            const avatar = user.profile_image || user.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=60";
+            const dateStr = user.createdAt ? new Date(user.createdAt).toLocaleDateString('tr-TR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }) : '-';
+            const office = user.agencyName || 'Bireysel';
+            
+            // Format role text and badge
+            const isUserAdmin = user.role === 'admin';
+            const isUserAssistant = user.role === 'assistant';
+            
+            let roleLabel = 'Danışman (Agent)';
+            let roleBadgeStyle = 'background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
+            
+            if (isUserAdmin) {
+                roleLabel = 'Yönetici (Admin)';
+                roleBadgeStyle = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
+            } else if (isUserAssistant) {
+                roleLabel = 'Asistan (Assistant)';
+                roleBadgeStyle = 'background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
+            }
+
+            const showDeleteBtn = isAdmin && user.uid !== activeUser.uid;
+            const deleteBtnHtml = showDeleteBtn 
+                ? `<button class="btn-delete-user" data-uid="${user.uid}" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--border-radius-sm); width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: #f87171; cursor: pointer; transition: all var(--transition-fast); margin-left: 8px; vertical-align: middle; padding: 0;" title="Kullanıcıyı Sil">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                   </button>` 
+                : '';
+
+            return `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <img src="${avatar}" alt="Avatar" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color);">
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${user.displayName || (user.firstName + ' ' + user.lastName)}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">${user.phone || 'Telefon belirtilmemiş'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="font-size: 13px; color: var(--text-secondary);">${user.email}</td>
+                    <td style="font-size: 13px; color: var(--text-secondary);">${dateStr}</td>
+                    <td style="font-size: 13px; color: var(--text-secondary);">🏢 ${office}</td>
+                    <td>
+                        <span style="${roleBadgeStyle}">${roleLabel}</span>
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <select class="role-select" data-uid="${user.uid}" ${isAdmin ? '' : 'disabled'} style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 6px 12px; color: var(--text-primary); font-size: 12px; cursor: ${isAdmin ? 'pointer' : 'not-allowed'}; min-width: 140px; outline: none; transition: all var(--transition-fast);">
+                                <option value="assistant" ${user.role === 'assistant' ? 'selected' : ''}>Asistan (Assistant)</option>
+                                <option value="agent" ${user.role === 'agent' ? 'selected' : ''}>Danışman (Agent)</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Yönetici (Admin)</option>
+                            </select>
+                            ${deleteBtnHtml}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Attach event listeners for role selection changes
+        const selects = container.querySelectorAll('.role-select');
+        selects.forEach(select => {
+            select.addEventListener('change', async (e) => {
+                const uid = select.getAttribute('data-uid');
+                const newRole = select.value;
+                
+                try {
+                    select.disabled = true;
+                    showToast("Rol güncelleniyor...", "info");
+                    
+                    const response = await apiFetch('/api/users/update-role', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: uid, newRole })
+                    });
+                    
+                    if (!response.ok) {
+                        const result = await response.json();
+                        throw new Error(result.error || "Rol değiştirilemedi.");
+                    }
+                    
+                    showToast("Kullanıcı rolü başarıyla güncellendi.", "success");
+                    updateUsersTable(container);
+                } catch (err) {
+                    console.error("Failed to update role:", err);
+                    showToast(err.message, "error");
+                    updateUsersTable(container);
+                }
+            });
+        });
+
+        // Attach event listeners for user deletion
+        const deleteButtons = container.querySelectorAll('.btn-delete-user');
+        deleteButtons.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const uid = btn.getAttribute('data-uid');
+                
+                if (confirm("Bu kullanıcıyı sistemden kalıcı olarak silmek istediğinizden emin misiniz?")) {
+                    try {
+                        btn.disabled = true;
+                        showToast("Kullanıcı siliniyor...", "info");
+                        
+                        const response = await apiFetch('/api/users/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: uid })
+                        });
+                        
+                        if (!response.ok) {
+                            const result = await response.json();
+                            throw new Error(result.error || "Kullanıcı silinemedi.");
+                        }
+                        
+                        showToast("Kullanıcı başarıyla silindi.", "success");
+                        updateUsersTable(container);
+                    } catch (err) {
+                        console.error("Failed to delete user:", err);
+                        showToast(err.message, "error");
+                        btn.disabled = false;
+                    }
+                }
+            });
+        });
+
+    } catch (err) {
+        console.error(err);
+        showToast("Kullanıcı listesi yüklenirken hata oluştu.", "error");
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    Yükleme başarısız.
+                </td>
+            </tr>
+        `;
+    }
+}
+
 export async function renderUsersView(container) {
     const activeUser = state.currentUser;
     const isAdmin = activeUser && activeUser.role === 'admin';
+    const hasPermissionsTab = !!container.querySelector('[data-tab="permissions"]');
+
+    if (container.querySelector('#users-table-body') && (isAdmin === hasPermissionsTab)) {
+        await updateUsersTable(container);
+        return;
+    }
 
     container.innerHTML = `
         <div class="view-header" style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 4px;">
@@ -127,8 +298,6 @@ export async function renderUsersView(container) {
         ` : ''}
     `;
 
-    const tableBody = container.querySelector('#users-table-body');
-
     // Tab switching logic
     if (isAdmin) {
         const tabButtons = container.querySelectorAll('.tab-btn');
@@ -206,162 +375,8 @@ export async function renderUsersView(container) {
         }
     }
 
-    try {
-        const res = await apiFetch('/api/users');
-        if (!res.ok) {
-            throw new Error("Kullanıcı listesi alınamadı.");
-        }
-        const users = await res.json();
-
-        if (users.length === 0) {
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                        Kayıtlı kullanıcı bulunamadı.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tableBody.innerHTML = users.map(user => {
-            const avatar = user.profile_image || user.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=60";
-            const dateStr = user.createdAt ? new Date(user.createdAt).toLocaleDateString('tr-TR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            }) : '-';
-            const office = user.agencyName || 'Bireysel';
-            
-            // Format role text and badge
-            const isUserAdmin = user.role === 'admin';
-            const isUserAssistant = user.role === 'assistant';
-            
-            let roleLabel = 'Danışman (Agent)';
-            let roleBadgeStyle = 'background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
-            
-            if (isUserAdmin) {
-                roleLabel = 'Yönetici (Admin)';
-                roleBadgeStyle = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
-            } else if (isUserAssistant) {
-                roleLabel = 'Asistan (Assistant)';
-                roleBadgeStyle = 'background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight:600; padding: 4px 10px; border-radius: 20px; font-size:11px; display:inline-block;';
-            }
-
-            const showDeleteBtn = isAdmin && user.uid !== activeUser.uid;
-            const deleteBtnHtml = showDeleteBtn 
-                ? `<button class="btn-delete-user" data-uid="${user.uid}" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--border-radius-sm); width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: #f87171; cursor: pointer; transition: all var(--transition-fast); margin-left: 8px; vertical-align: middle; padding: 0;" title="Kullanıcıyı Sil">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                   </button>` 
-                : '';
-
-            return `
-                <tr>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <img src="${avatar}" alt="Avatar" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color);">
-                            <div>
-                                <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${user.displayName || (user.firstName + ' ' + user.lastName)}</div>
-                                <div style="font-size: 11px; color: var(--text-muted);">${user.phone || 'Telefon belirtilmemiş'}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td style="font-size: 13px; color: var(--text-secondary);">${user.email}</td>
-                    <td style="font-size: 13px; color: var(--text-secondary);">${dateStr}</td>
-                    <td style="font-size: 13px; color: var(--text-secondary);">🏢 ${office}</td>
-                    <td>
-                        <span style="${roleBadgeStyle}">${roleLabel}</span>
-                    </td>
-                    <td>
-                        <div style="display: flex; align-items: center;">
-                            <select class="role-select" data-uid="${user.uid}" ${isAdmin ? '' : 'disabled'} style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 6px 12px; color: var(--text-primary); font-size: 12px; cursor: ${isAdmin ? 'pointer' : 'not-allowed'}; min-width: 140px; outline: none; transition: all var(--transition-fast);">
-                                <option value="assistant" ${user.role === 'assistant' ? 'selected' : ''}>Asistan (Assistant)</option>
-                                <option value="agent" ${user.role === 'agent' ? 'selected' : ''}>Danışman (Agent)</option>
-                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Yönetici (Admin)</option>
-                            </select>
-                            ${deleteBtnHtml}
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-
-        // Attach event listeners for role selection changes
-        const selects = container.querySelectorAll('.role-select');
-        selects.forEach(select => {
-            select.addEventListener('change', async (e) => {
-                const uid = select.getAttribute('data-uid');
-                const newRole = select.value;
-                
-                try {
-                    select.disabled = true;
-                    showToast("Rol güncelleniyor...", "info");
-                    
-                    const response = await apiFetch('/api/users/update-role', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: uid, newRole })
-                    });
-                    
-                    if (!response.ok) {
-                        const result = await response.json();
-                        throw new Error(result.error || "Rol değiştirilemedi.");
-                    }
-                    
-                    showToast("Kullanıcı rolü başarıyla güncellendi.", "success");
-                    renderUsersView(container);
-                } catch (err) {
-                    console.error("Failed to update role:", err);
-                    showToast(err.message, "error");
-                    renderUsersView(container);
-                }
-            });
-        });
-
-        // Attach event listeners for user deletion
-        const deleteButtons = container.querySelectorAll('.btn-delete-user');
-        deleteButtons.forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const uid = btn.getAttribute('data-uid');
-                
-                if (confirm("Bu kullanıcıyı sistemden kalıcı olarak silmek istediğinizden emin misiniz?")) {
-                    try {
-                        btn.disabled = true;
-                        showToast("Kullanıcı siliniyor...", "info");
-                        
-                        const response = await apiFetch('/api/users/delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: uid })
-                        });
-                        
-                        if (!response.ok) {
-                            const result = await response.json();
-                            throw new Error(result.error || "Kullanıcı silinemedi.");
-                        }
-                        
-                        showToast("Kullanıcı başarıyla silindi.", "success");
-                        renderUsersView(container);
-                    } catch (err) {
-                        console.error("Failed to delete user:", err);
-                        showToast(err.message, "error");
-                        btn.disabled = false;
-                    }
-                }
-            });
-        });
-
-    } catch (err) {
-        console.error(err);
-        showToast("Kullanıcı listesi yüklenirken hata oluştu.", "error");
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    Yükleme başarısız.
-                </td>
-            </tr>
-        `;
-    }
+    // Load initial users
+    await updateUsersTable(container);
 }
 
 async function loadPermissions(container) {
