@@ -271,133 +271,169 @@ function openPortfolioDetailModal(p) {
     const matchingBuyers = getMatchesForPortfolio(p);
     
     const content = `
-        <div class="detail-grid">
-            <div>
-                <img src="${p.imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=500&auto=format&fit=crop&q=60'}" class="detail-img" alt="Mülk Resmi">
-                <div style="margin-top:16px;">
-                    <h4 style="margin-bottom:8px;">Danışman Notları</h4>
-                    <p style="font-size:13px; color:var(--text-secondary); line-height:1.6; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:var(--border-radius-md);">${p.notes || "Not eklenmemiş."}</p>
-                </div>
-                
-                <!-- Matching Buyers Section -->
-                <div class="detail-matches">
-                    <h4 style="display:flex; justify-content:space-between; align-items:center;">
-                        <span>Eşleşen Alıcı Müşteriler</span>
-                        <span class="kanban-column-count">${matchingBuyers.length}</span>
-                    </h4>
-                    <div class="matches-list">
-                        ${matchingBuyers.length === 0 ? `
-                            <p style="font-size:12px; color:var(--text-muted);">Bu portföyün kriterlerine uyan alıcı müşteri bulunamadı.</p>
-                        ` : matchingBuyers.map(b => {
-                            const isAuthorized = canViewPhone(b);
-                            return `
-                                <div class="match-item" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid var(--border-color);">
-                                    <div class="match-client-info" style="display:flex; flex-direction:column;">
-                                        <span class="match-name" style="font-weight:600; font-size:12px;">${b.name}</span>
-                                        <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${b.searchRooms || b.aralanan_oda_sayisi || ''} | Bütçe: ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(b.budget || b.maksimum_butce)}</span>
+        <div class="tabs" style="margin-bottom: 20px;">
+            <button class="tab-btn active" id="tab-btn-general" style="font-size: 13px;">Genel Bilgiler</button>
+            <button class="tab-btn" id="tab-btn-financial" style="font-size: 13px;">📊 Yatırım & Finansal Analiz</button>
+        </div>
+        
+        <div id="tab-content-general">
+            <div class="detail-grid">
+                <div>
+                    <img src="${p.imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=500&auto=format&fit=crop&q=60'}" class="detail-img" alt="Mülk Resmi">
+                    <div style="margin-top:16px;">
+                        <h4 style="margin-bottom:8px;">Danışman Notları</h4>
+                        <p style="font-size:13px; color:var(--text-secondary); line-height:1.6; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:var(--border-radius-md);">${p.notes || "Not eklenmemiş."}</p>
+                    </div>
+                    
+                    <!-- Matching Buyers Section -->
+                    <div class="detail-matches">
+                        <h4 style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>Eşleşen Alıcı Müşteriler</span>
+                            <span class="kanban-column-count">${matchingBuyers.length}</span>
+                        </h4>
+                        <div class="matches-list">
+                            ${matchingBuyers.length === 0 ? `
+                                <p style="font-size:12px; color:var(--text-muted);">Bu portföyün kriterlerine uyan alıcı müşteri bulunamadı.</p>
+                            ` : matchingBuyers.map(b => {
+                                const isAuthorized = canViewPhone(b);
+                                return `
+                                    <div class="match-item" style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid var(--border-color);">
+                                        <div class="match-client-info" style="display:flex; flex-direction:column;">
+                                            <span class="match-name" style="font-weight:600; font-size:12px;">${b.name}</span>
+                                            <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${b.searchRooms || b.aralanan_oda_sayisi || ''} | Bütçe: ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(b.budget || b.maksimum_butce)}</span>
+                                        </div>
+                                        <div style="display:flex; gap:8px; align-items:center;">
+                                            <a href="${isAuthorized ? 'tel:' + b.phone : '#'}" 
+                                               class="btn btn-sm ${isAuthorized ? 'btn-outline' : 'btn-disabled'}" 
+                                               style="padding:6px 12px; font-size:11px; text-decoration:none; ${!isAuthorized ? 'opacity:0.4; cursor:not-allowed; pointer-events:none;' : ''}">
+                                                Ara ${!isAuthorized ? '🔒' : ''}
+                                            </a>
+                                            <button class="btn btn-sm btn-secondary btn-congratulate" 
+                                                    style="padding:6px 12px; font-size:11px; ${!isAuthorized ? 'opacity:0.4; cursor:not-allowed;' : ''}" 
+                                                    data-client-name="${b.name}" 
+                                                    data-client-phone="${b.phone}"
+                                                    ${!isAuthorized ? 'disabled' : ''}>
+                                                Paylaş ${!isAuthorized ? '🔒' : ''}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div style="display:flex; gap:8px; align-items:center;">
-                                        <a href="${isAuthorized ? 'tel:' + b.phone : '#'}" 
-                                           class="btn btn-sm ${isAuthorized ? 'btn-outline' : 'btn-disabled'}" 
-                                           style="padding:6px 12px; font-size:11px; text-decoration:none; ${!isAuthorized ? 'opacity:0.4; cursor:not-allowed; pointer-events:none;' : ''}">
-                                            Ara ${!isAuthorized ? '🔒' : ''}
-                                        </a>
-                                        <button class="btn btn-sm btn-secondary btn-congratulate" 
-                                                style="padding:6px 12px; font-size:11px; ${!isAuthorized ? 'opacity:0.4; cursor:not-allowed;' : ''}" 
-                                                data-client-name="${b.name}" 
-                                                data-client-phone="${b.phone}"
-                                                ${!isAuthorized ? 'disabled' : ''}>
-                                            Paylaş ${!isAuthorized ? '🔒' : ''}
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-            </div>
-            
-            <div class="detail-info">
-                <div class="detail-price-row">
-                    <span class="detail-price">${formattedPrice}</span>
-                    <span class="portfolio-type-badge ${p.type.toLowerCase()}">${p.type}</span>
-                </div>
-                
-                <div class="specs-grid">
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Emlak Tipi</span>
-                        <span class="spec-entry-value">${p.propertyType}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Oda Sayısı</span>
-                        <span class="spec-entry-value">${p.rooms}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Net Metrekare</span>
-                        <span class="spec-entry-value">${p.area} m²</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Konum</span>
-                        <span class="spec-entry-value">${p.district}, ${p.neighborhood}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Bina Yaşı</span>
-                        <span class="spec-entry-value">${p.age || "Belirtilmemiş"}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Isınma</span>
-                        <span class="spec-entry-value">${p.heating || "Belirtilmemiş"}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Tapu Durumu</span>
-                        <span class="spec-entry-value">${p.titleStatus || "Belirtilmemiş"}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Komisyon Oranı</span>
-                        <span class="spec-entry-value">${formatComm}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Sözleşme Tipi</span>
-                        <span class="spec-entry-value">${p.sozlesme_tipi || "-"}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Sözleşme Bitiş</span>
-                        <span class="spec-entry-value">${p.sozlesme_bitis_tarihi ? formatDate(p.sozlesme_bitis_tarihi) : "-"}</span>
-                    </div>
-                    <div class="spec-entry">
-                        <span class="spec-entry-label">Mülk Durumu</span>
-                        <span class="spec-entry-value">${p.mulk_durumu || "-"}</span>
-                    </div>
-                    <div class="spec-entry" style="grid-column: span 2;">
-                        <span class="spec-entry-label">Tapu Durumu Notları</span>
-                        <span class="spec-entry-value">${p.tapu_durumu_notlari || "-"}</span>
-                    </div>
-                </div>
-                
-                <div style="border-top:1px solid var(--border-color); padding-top:16px;">
-                    <div class="agent-profile">
-                        <img src="${p.createdByPhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=60'}" class="agent-avatar" style="width:30px; height:30px;" alt="Avatar">
-                        <div>
-                            <div style="font-weight:600;">${p.createdByName}</div>
-                            <div style="font-size:10px; color:var(--text-muted);">İlan Sahibi Danışman</div>
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 </div>
                 
-                <div style="display:flex; flex-direction:column; gap:8px; margin-top:20px;">
-                    <button id="btn-social-gen" class="btn btn-secondary">
-                        ✨ Sosyal Medya İlan Metni Üret
-                    </button>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                        <button id="btn-edit-p" class="btn btn-outline">Düzenle</button>
-                        <button id="btn-delete-p" class="btn btn-danger">İlanı Sil</button>
+                <div class="detail-info">
+                    <div class="detail-price-row">
+                        <span class="detail-price">${formattedPrice}</span>
+                        <span class="portfolio-type-badge ${p.type.toLowerCase()}">${p.type}</span>
+                    </div>
+                    
+                    <div class="specs-grid">
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Emlak Tipi</span>
+                            <span class="spec-entry-value">${p.propertyType}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Oda Sayısı</span>
+                            <span class="spec-entry-value">${p.rooms}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Net Metrekare</span>
+                            <span class="spec-entry-value">${p.area} m²</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Konum</span>
+                            <span class="spec-entry-value">${p.district}, ${p.neighborhood}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Bina Yaşı</span>
+                            <span class="spec-entry-value">${p.age || "Belirtilmemiş"}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Isınma</span>
+                            <span class="spec-entry-value">${p.heating || "Belirtilmemiş"}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Tapu Durumu</span>
+                            <span class="spec-entry-value">${p.titleStatus || "Belirtilmemiş"}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Komisyon Oranı</span>
+                            <span class="spec-entry-value">${formatComm}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Sözleşme Tipi</span>
+                            <span class="spec-entry-value">${p.sozlesme_tipi || "-"}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Sözleşme Bitiş</span>
+                            <span class="spec-entry-value">${p.sozlesme_bitis_tarihi ? formatDate(p.sozlesme_bitis_tarihi) : "-"}</span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Mülk Durumu</span>
+                            <span class="spec-entry-value">${p.mulk_durumu || "-"}</span>
+                        </div>
+                        <div class="spec-entry" style="grid-column: span 2;">
+                            <span class="spec-entry-label">Tapu Durumu Notları</span>
+                            <span class="spec-entry-value">${p.tapu_durumu_notlari || "-"}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="border-top:1px solid var(--border-color); padding-top:16px;">
+                        <div class="agent-profile">
+                            <img src="${p.createdByPhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=60'}" class="agent-avatar" style="width:30px; height:30px;" alt="Avatar">
+                            <div>
+                                <div style="font-weight:600;">${p.createdByName}</div>
+                                <div style="font-size:10px; color:var(--text-muted);">İlan Sahibi Danışman</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-top:20px;">
+                        <button id="btn-social-gen" class="btn btn-secondary">
+                            ✨ Sosyal Medya İlan Metni Üret
+                        </button>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                            <button id="btn-edit-p" class="btn btn-outline">Düzenle</button>
+                            <button id="btn-delete-p" class="btn btn-danger">İlanı Sil</button>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
+        
+        <div id="tab-content-financial" class="hidden">
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <div class="spinner" style="margin: 0 auto 12px auto;"></div>
+                <p>Finansal analiz verileri yükleniyor...</p>
             </div>
         </div>
     `;
     
     openModal(p.title, content);
+    
+    // Tab Switching functionality
+    const tabBtnGeneral = document.getElementById('tab-btn-general');
+    const tabBtnFinancial = document.getElementById('tab-btn-financial');
+    const tabContentGeneral = document.getElementById('tab-content-general');
+    const tabContentFinancial = document.getElementById('tab-content-financial');
+    
+    tabBtnGeneral.addEventListener('click', () => {
+        tabBtnGeneral.classList.add('active');
+        tabBtnFinancial.classList.remove('active');
+        tabContentGeneral.classList.remove('hidden');
+        tabContentFinancial.classList.add('hidden');
+    });
+    
+    tabBtnFinancial.addEventListener('click', async () => {
+        tabBtnFinancial.classList.add('active');
+        tabBtnGeneral.classList.remove('active');
+        tabContentFinancial.classList.remove('hidden');
+        tabContentGeneral.classList.add('hidden');
+        
+        await loadFinancialAnalysis(p);
+    });
     
     // 1. Social Generator Click
     document.getElementById('btn-social-gen').addEventListener('click', () => {
@@ -440,6 +476,254 @@ function openPortfolioDetailModal(p) {
             });
         });
     });
+}
+
+async function loadFinancialAnalysis(p) {
+    const tabContentFinancial = document.getElementById('tab-content-financial');
+    
+    // Check if current rent is not entered or zero
+    if (!p.current_rent || p.current_rent <= 0) {
+        tabContentFinancial.innerHTML = `
+            <div class="card" style="padding: 32px; text-align: center; background: rgba(255,255,255,0.01); border: 1px dashed var(--border-color); border-radius: var(--border-radius-md);">
+                <div style="font-size: 40px; margin-bottom: 12px;">📊</div>
+                <h4 style="margin-bottom: 8px;">Kira Getiri Bilgisi Eksik</h4>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+                    Bu mülk için aylık kira getiri verisi tanımlanmamış. ROI analizi ve 5 yıllık alternatif yatırım projeksiyonlarını görmek için lütfen ilan detaylarını düzenleyin.
+                </p>
+                <button id="btn-edit-p-financial" class="btn btn-primary" style="margin: 0 auto; display: block; padding: 8px 24px;">Mülkü Düzenle</button>
+            </div>
+        `;
+        document.getElementById('btn-edit-p-financial').addEventListener('click', () => {
+            closeModal();
+            openEditPortfolioModal(p);
+        });
+        return;
+    }
+    
+    try {
+        tabContentFinancial.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <div class="spinner" style="margin: 0 auto 12px auto;"></div>
+                <p>Finansal analiz verileri yükleniyor...</p>
+            </div>
+        `;
+        
+        const res = await apiFetch(`/api/portfolio/${p.id}/roi-analysis`);
+        if (!res.ok) {
+            throw new Error("Analiz verisi yüklenirken hata oluştu.");
+        }
+        const data = await res.json();
+        
+        const formatCurrency = (val) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(val);
+        
+        tabContentFinancial.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                <div class="card" style="padding: 12px; background: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.1);">
+                    <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Kira Getirisi (Cap Rate)</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #10b981; margin-top: 4px;">%${data.capRate.toFixed(2)}</div>
+                </div>
+                <div class="card" style="padding: 12px; background: rgba(167, 139, 250, 0.03); border: 1px solid rgba(167, 139, 250, 0.1);">
+                    <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Amortisman Süresi</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #a78bfa; margin-top: 4px;">${data.amortizationYears.toFixed(1)} Yıl</div>
+                </div>
+                <div class="card" style="padding: 12px; background: rgba(234, 88, 12, 0.03); border: 1px solid rgba(234, 88, 12, 0.1);">
+                    <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Aylık Kira Getirisi</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #ea580c; margin-top: 4px;">${formatCurrency(data.currentRent)}</div>
+                </div>
+                <div class="card" style="padding: 12px; background: rgba(59, 130, 246, 0.03); border: 1px solid rgba(59, 130, 246, 0.1);">
+                    <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Yıllık Değer Artışı</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #3b82f6; margin-top: 4px;">%${data.growthRate}</div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px; margin-bottom: 16px;">
+                <div class="card" style="padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px;">
+                    <h5 style="margin-bottom: 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); text-align: center; width: 100%;">Yatırım Verimlilik Oranı</h5>
+                    <div style="width: 140px; height: 140px; position: relative;">
+                        <canvas id="chart-cap-rate"></canvas>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                            <div style="font-size: 16px; font-weight: 800; color: var(--text-primary);">%${data.capRate.toFixed(2)}</div>
+                            <div style="font-size: 8px; color: var(--text-muted); text-transform: uppercase;">Cap Rate</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="padding: 16px; min-height: 220px; display: flex; flex-direction: column;">
+                    <h5 style="margin-bottom: 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">5. Yıl Sonu Alternatif Kıyaslama</h5>
+                    <div style="flex: 1; min-height: 150px; position: relative;">
+                        <canvas id="chart-alternative-comparison"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" style="padding: 16px; display: flex; flex-direction: column;">
+                <h5 style="margin-bottom: 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Mülk Değeri ve Kira Büyüme Eğrisi</h5>
+                <div style="height: 220px; position: relative; width: 100%;">
+                    <canvas id="chart-growth-curve"></canvas>
+                </div>
+            </div>
+        `;
+        
+        // Destroy existing chart instances to avoid canvas reuse error
+        if (window.activeFinancialCharts) {
+            window.activeFinancialCharts.forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+        }
+        window.activeFinancialCharts = [];
+        
+        // Render Chart.js instances
+        // 1. Doughnut Gauge Chart for Cap Rate
+        const capRateCtx = document.getElementById('chart-cap-rate').getContext('2d');
+        const maxCap = Math.max(10, data.capRate);
+        const capChart = new Chart(capRateCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Cap Rate', 'Kalan'],
+                datasets: [{
+                    data: [data.capRate, maxCap - data.capRate],
+                    backgroundColor: ['#8b5cf6', 'rgba(255, 255, 255, 0.05)'],
+                    borderWidth: 0,
+                    hoverBackgroundColor: ['#8b5cf6', 'rgba(255, 255, 255, 0.05)']
+                }]
+            },
+            options: {
+                cutout: '80%',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            }
+        });
+        window.activeFinancialCharts.push(capChart);
+        
+        // 2. Bar Chart for 5th-year alternative comparison
+        const compCtx = document.getElementById('chart-alternative-comparison').getContext('2d');
+        const labelsComp = data.datasets.map(d => d.label);
+        const valuesComp = data.datasets.map(d => d.data[5]);
+        const compChart = new Chart(compCtx, {
+            type: 'bar',
+            data: {
+                labels: labelsComp,
+                datasets: [{
+                    data: valuesComp,
+                    backgroundColor: ['#10b981', '#8b5cf6', '#ea580c'],
+                    borderRadius: 6,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ' ' + formatCurrency(context.raw);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: 'var(--text-secondary)', font: { size: 9 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: {
+                            color: 'var(--text-secondary)',
+                            font: { size: 9 },
+                            callback: function(value) {
+                                return (value / 1000000).toFixed(1) + 'M ₺';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        window.activeFinancialCharts.push(compChart);
+        
+        // 3. Line Chart for 5-Year projections
+        const growthCtx = document.getElementById('chart-growth-curve').getContext('2d');
+        const growthChart = new Chart(growthCtx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: 'Mülk Değeri',
+                        data: data.propertyValueProjection,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Kümülatif Kira Getirisi',
+                        data: data.cumulativeRentProjection,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { color: 'var(--text-secondary)', font: { size: 10 }, boxWidth: 12 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ' ' + context.dataset.label + ': ' + formatCurrency(context.raw);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: 'var(--text-secondary)', font: { size: 9 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: {
+                            color: 'var(--text-secondary)',
+                            font: { size: 9 },
+                            callback: function(value) {
+                                return (value / 1000000).toFixed(1) + 'M ₺';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        window.activeFinancialCharts.push(growthChart);
+        
+    } catch (e) {
+        console.error("loadFinancialAnalysis error:", e);
+        tabContentFinancial.innerHTML = `
+            <div style="text-align: center; padding: 24px; color: var(--text-danger);">
+                <p>Veriler yüklenirken bir hata oluştu: ${e.message}</p>
+            </div>
+        `;
+    }
 }
 
 // Social Media Caption Builder
@@ -547,6 +831,17 @@ function openAddPortfolioModal() {
                         <option value="iptal">İptal</option>
                         <option value="satildi">Satıldı</option>
                     </select>
+                </div>
+            </div>
+            
+            <div class="form-group-row">
+                <div class="form-group">
+                    <label for="p-rent">Aylık Kira Getirisi (TL)</label>
+                    <input type="number" id="p-rent" placeholder="Varsayılan: 0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="p-growth">Tahmini Yıllık Değer Artışı (%)</label>
+                    <input type="number" id="p-growth" placeholder="Varsayılan: 15" value="15">
                 </div>
             </div>
             
@@ -681,7 +976,10 @@ function openAddPortfolioModal() {
             sozlesme_tipi: document.getElementById('p-sozlesme-tipi').value,
             sozlesme_bitis_tarihi: document.getElementById('p-sozlesme-bitis').value,
             mulk_durumu: document.getElementById('p-mulk-durumu').value,
-            tapu_durumu_notlari: document.getElementById('p-tapu-notlari').value.trim()
+            tapu_durumu_notlari: document.getElementById('p-tapu-notlari').value.trim(),
+            current_rent: Number(document.getElementById('p-rent').value) || 0,
+            annual_growth_estimate: Number(document.getElementById('p-growth').value) || 15,
+            inflation_estimate: 25
         };
         
         try {
@@ -753,6 +1051,17 @@ function openEditPortfolioModal(p) {
                         <option value="iptal" ${(p.status || '').toLowerCase() === 'iptal' ? 'selected' : ''}>İptal</option>
                         <option value="satildi" ${(p.status || '').toLowerCase() === 'satildi' ? 'selected' : ''}>Satıldı</option>
                     </select>
+                </div>
+            </div>
+            
+            <div class="form-group-row">
+                <div class="form-group">
+                    <label for="pe-rent">Aylık Kira Getirisi (TL)</label>
+                    <input type="number" id="pe-rent" value="${p.current_rent || 0}">
+                </div>
+                <div class="form-group">
+                    <label for="pe-growth">Tahmini Yıllık Değer Artışı (%)</label>
+                    <input type="number" id="pe-growth" value="${p.annual_growth_estimate || 15}">
                 </div>
             </div>
             
@@ -891,7 +1200,10 @@ function openEditPortfolioModal(p) {
             sozlesme_tipi: document.getElementById('pe-sozlesme-tipi').value,
             sozlesme_bitis_tarihi: document.getElementById('pe-sozlesme-bitis').value,
             mulk_durumu: document.getElementById('pe-mulk-durumu').value,
-            tapu_durumu_notlari: document.getElementById('pe-tapu-notlari').value.trim()
+            tapu_durumu_notlari: document.getElementById('pe-tapu-notlari').value.trim(),
+            current_rent: Number(document.getElementById('pe-rent').value) || 0,
+            annual_growth_estimate: Number(document.getElementById('pe-growth').value) || 15,
+            inflation_estimate: p.inflation_estimate || 25
         };
         
         try {

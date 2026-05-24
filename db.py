@@ -112,7 +112,10 @@ def init_db():
                 sozlesme_tipi TEXT,
                 sozlesme_bitis_tarihi TEXT,
                 mulk_durumu TEXT,
-                tapu_durumu_notlari TEXT
+                tapu_durumu_notlari TEXT,
+                current_rent REAL DEFAULT 0,
+                annual_growth_estimate REAL DEFAULT 15,
+                inflation_estimate REAL DEFAULT 25
             )
         ''')
 
@@ -239,6 +242,9 @@ def init_db():
             ("customers", "property_sold_date", "TEXT"),
             ("customers", "status", "TEXT DEFAULT 'aktif'"),
             ("portfolios", "status", "TEXT DEFAULT 'aktif'"),
+            ("portfolios", "current_rent", "REAL DEFAULT 0"),
+            ("portfolios", "annual_growth_estimate", "REAL DEFAULT 15"),
+            ("portfolios", "inflation_estimate", "REAL DEFAULT 25"),
         ]
         for table, col, col_type in alter_queries:
             try:
@@ -246,10 +252,13 @@ def init_db():
             except sqlite3.OperationalError:
                 pass  # Kolon zaten var
 
-        # Set default values for empty statuses
+        # Set default values for empty statuses and financial projections
         try:
             cursor.execute("UPDATE portfolios SET status = 'aktif' WHERE status IS NULL OR status = ''")
             cursor.execute("UPDATE customers SET status = 'aktif' WHERE status IS NULL OR status = ''")
+            cursor.execute("UPDATE portfolios SET current_rent = 0 WHERE current_rent IS NULL")
+            cursor.execute("UPDATE portfolios SET annual_growth_estimate = 15 WHERE annual_growth_estimate IS NULL")
+            cursor.execute("UPDATE portfolios SET inflation_estimate = 25 WHERE inflation_estimate IS NULL")
         except sqlite3.OperationalError:
             pass
 

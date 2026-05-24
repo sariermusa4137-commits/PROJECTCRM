@@ -13,6 +13,7 @@ from .profile import profile_bp
 from .export import export_bp
 from .static_routes import static_bp
 from .matchmaking import matchmaking_bp
+from .analytics import analytics_bp
 
 ALL_BLUEPRINTS = [
     auth_bp,
@@ -25,4 +26,5 @@ ALL_BLUEPRINTS = [
     export_bp,
     static_bp,
     matchmaking_bp,
+    analytics_bp,
 ]
