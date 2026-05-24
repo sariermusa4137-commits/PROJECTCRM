@@ -147,7 +147,8 @@ def init_db():
                 property_sold_date TEXT,
                 mulk_durumu TEXT,
                 tapu_durumu_notlari TEXT,
-                status TEXT DEFAULT 'aktif'
+                status TEXT DEFAULT 'aktif',
+                status_preference TEXT DEFAULT 'Satılık'
             )
         ''')
 
@@ -241,6 +242,7 @@ def init_db():
             ("customers", "contract_end_date", "TEXT"),
             ("customers", "property_sold_date", "TEXT"),
             ("customers", "status", "TEXT DEFAULT 'aktif'"),
+            ("customers", "status_preference", "TEXT DEFAULT 'Satılık'"),
             ("portfolios", "status", "TEXT DEFAULT 'aktif'"),
             ("portfolios", "current_rent", "REAL DEFAULT 0"),
             ("portfolios", "annual_growth_estimate", "REAL DEFAULT 15"),
@@ -256,6 +258,7 @@ def init_db():
         try:
             cursor.execute("UPDATE portfolios SET status = 'aktif' WHERE status IS NULL OR status = ''")
             cursor.execute("UPDATE customers SET status = 'aktif' WHERE status IS NULL OR status = ''")
+            cursor.execute("UPDATE customers SET status_preference = 'Satılık' WHERE status_preference IS NULL OR status_preference = ''")
             cursor.execute("UPDATE portfolios SET current_rent = 0 WHERE current_rent IS NULL")
             cursor.execute("UPDATE portfolios SET annual_growth_estimate = 15 WHERE annual_growth_estimate IS NULL")
             cursor.execute("UPDATE portfolios SET inflation_estimate = 25 WHERE inflation_estimate IS NULL")

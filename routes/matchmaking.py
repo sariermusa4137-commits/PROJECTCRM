@@ -62,8 +62,16 @@ def get_matchmaking_opportunities():
                 c_budget = float(customer.get('budget') or customer.get('maksimum_butce') or 0)
                 c_loc = normalize_text(customer.get('searchLocation') or customer.get('hedef_bolge') or "")
                 c_rooms = normalize_text(customer.get('searchRooms') or customer.get('aralanan_oda_sayisi') or "")
+                c_pref = customer.get('status_preference') or 'Satılık'
 
                 for portfolio in portfolios:
+                    p_type = portfolio.get('type') # 'Satılık' / 'Kiralık'
+                    # status_preference match check:
+                    # If preference is 'Hem Satılık Hem Kiralık', it matches any portfolio type.
+                    # Otherwise, the portfolio type must match the preference exactly.
+                    if c_pref != "Hem Satılık Hem Kiralık" and p_type != c_pref:
+                        continue
+
                     p_price = float(portfolio.get('price') or portfolio.get('fiyat') or 0)
                     p_rooms = normalize_text(portfolio.get('rooms') or portfolio.get('oda_sayisi') or "")
                     p_dist = normalize_text(portfolio.get('district') or portfolio.get('bolge') or "")

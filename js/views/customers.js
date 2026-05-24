@@ -623,7 +623,7 @@ function openAddCustomerModal() {
                 </div>
             </div>
             
-            <div class="form-group-three">
+            <div class="form-group-row">
                 <div class="form-group">
                     <label for="c-type">Müşteri Tipi</label>
                     <select id="c-type">
@@ -635,6 +635,9 @@ function openAddCustomerModal() {
                     <label for="c-budget">Bütçe (TL)</label>
                     <input type="number" id="c-budget" placeholder="Bütçe girin..." value="0">
                 </div>
+            </div>
+            
+            <div class="form-group-row" id="c-prop-type-status-pref-row">
                 <div class="form-group" id="c-prop-type-group">
                     <label for="c-prop-type">Aranan Emlak Tipi</label>
                     <select id="c-prop-type">
@@ -642,6 +645,14 @@ function openAddCustomerModal() {
                         <option value="Villa">Villa</option>
                         <option value="Arsa">Arsa</option>
                         <option value="Ticari">Ticari</option>
+                    </select>
+                </div>
+                <div class="form-group" id="c-status-pref-group">
+                    <label for="c-status-pref">Talep Tipi (Satılık/Kiralık)</label>
+                    <select id="c-status-pref" name="status_preference">
+                        <option value="Satılık">Satılık</option>
+                        <option value="Kiralık">Kiralık</option>
+                        <option value="Hem Satılık Hem Kiralık">Hem Satılık Hem Kiralık</option>
                     </select>
                 </div>
             </div>
@@ -747,7 +758,7 @@ function openAddCustomerModal() {
     const buyerExtra = document.getElementById('buyer-extra-fields');
     const sellerExtra = document.getElementById('seller-extra-fields');
     const budgetGroup = document.getElementById('c-budget-group');
-    const propTypeGroup = document.getElementById('c-prop-type-group');
+    const propTypeRow = document.getElementById('c-prop-type-status-pref-row');
     
     typeSelect.addEventListener('change', () => {
         if (typeSelect.value === 'Satıcı') {
@@ -755,13 +766,13 @@ function openAddCustomerModal() {
             buyerExtra.style.display = 'none';
             sellerExtra.style.display = 'block';
             budgetGroup.style.display = 'none';
-            propTypeGroup.style.display = 'none';
+            propTypeRow.style.display = 'none';
         } else {
             criteriaRow.style.display = 'grid';
             buyerExtra.style.display = 'block';
             sellerExtra.style.display = 'none';
             budgetGroup.style.display = 'block';
-            propTypeGroup.style.display = 'block';
+            propTypeRow.style.display = 'grid';
         }
     });
     
@@ -786,6 +797,7 @@ function openAddCustomerModal() {
             lifecycle_stage: "Potansiyel",
             
             // New fields
+            status_preference: type === 'Alıcı' ? document.getElementById('c-status-pref').value : "Satılık",
             finansman_tipi: type === 'Alıcı' ? document.getElementById('c-finansman').value : "",
             satin_alma_amaci: type === 'Alıcı' ? document.getElementById('c-amac').value : "",
             yabanci_satis: type === 'Alıcı' ? document.getElementById('c-yabanci').value : "",
@@ -845,7 +857,7 @@ function openEditCustomerModal(c) {
                 </div>
             </div>
             
-            <div class="form-group-three">
+            <div class="form-group-row">
                 <div class="form-group">
                     <label for="ce-type">Müşteri Tipi</label>
                     <select id="ce-type">
@@ -857,13 +869,24 @@ function openEditCustomerModal(c) {
                     <label for="ce-budget">Bütçe (TL)</label>
                     <input type="number" id="ce-budget" value="${c.budget || 0}">
                 </div>
-                <div class="form-group" id="ce-prop-type-group" style="display:${c.type === 'Satıcı' ? 'none' : 'block'};">
+            </div>
+            
+            <div class="form-group-row" id="ce-prop-type-status-pref-row" style="display:${c.type === 'Satıcı' ? 'none' : 'grid'};">
+                <div class="form-group" id="ce-prop-type-group">
                     <label for="ce-prop-type">Aranan Emlak Tipi</label>
                     <select id="ce-prop-type">
                         <option value="Daire" ${c.searchPropertyType === 'Daire' ? 'selected' : ''}>Daire</option>
                         <option value="Villa" ${c.searchPropertyType === 'Villa' ? 'selected' : ''}>Villa</option>
                         <option value="Arsa" ${c.searchPropertyType === 'Arsa' ? 'selected' : ''}>Arsa</option>
                         <option value="Ticari" ${c.searchPropertyType === 'Ticari' ? 'selected' : ''}>Ticari</option>
+                    </select>
+                </div>
+                <div class="form-group" id="ce-status-pref-group">
+                    <label for="ce-status-pref">Talep Tipi (Satılık/Kiralık)</label>
+                    <select id="ce-status-pref" name="status_preference">
+                        <option value="Satılık" ${(c.status_preference || 'Satılık') === 'Satılık' ? 'selected' : ''}>Satılık</option>
+                        <option value="Kiralık" ${c.status_preference === 'Kiralık' ? 'selected' : ''}>Kiralık</option>
+                        <option value="Hem Satılık Hem Kiralık" ${c.status_preference === 'Hem Satılık Hem Kiralık' ? 'selected' : ''}>Hem Satılık Hem Kiralık</option>
                     </select>
                 </div>
             </div>
@@ -968,7 +991,7 @@ function openEditCustomerModal(c) {
     const buyerExtra = document.getElementById('edit-buyer-extra-fields');
     const sellerExtra = document.getElementById('edit-seller-extra-fields');
     const budgetGroup = document.getElementById('ce-budget-group');
-    const propTypeGroup = document.getElementById('ce-prop-type-group');
+    const propTypeRow = document.getElementById('ce-prop-type-status-pref-row');
     
     typeSelect.addEventListener('change', () => {
         if (typeSelect.value === 'Satıcı') {
@@ -976,13 +999,13 @@ function openEditCustomerModal(c) {
             buyerExtra.style.display = 'none';
             sellerExtra.style.display = 'block';
             budgetGroup.style.display = 'none';
-            propTypeGroup.style.display = 'none';
+            propTypeRow.style.display = 'none';
         } else {
             criteriaRow.style.display = 'grid';
             buyerExtra.style.display = 'block';
             sellerExtra.style.display = 'none';
             budgetGroup.style.display = 'block';
-            propTypeGroup.style.display = 'block';
+            propTypeRow.style.display = 'grid';
         }
     });
     
@@ -1007,6 +1030,7 @@ function openEditCustomerModal(c) {
             lifecycle_stage: c.lifecycle_stage || "Potansiyel",
             
             // New fields
+            status_preference: type === 'Alıcı' ? document.getElementById('ce-status-pref').value : "Satılık",
             finansman_tipi: type === 'Alıcı' ? document.getElementById('ce-finansman').value : "",
             satin_alma_amaci: type === 'Alıcı' ? document.getElementById('ce-amac').value : "",
             yabanci_satis: type === 'Alıcı' ? document.getElementById('ce-yabanci').value : "",
