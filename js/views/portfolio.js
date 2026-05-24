@@ -4,6 +4,23 @@ import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, c
 import { initMap, renderPortfolioMarkers, enableLocationSelection, setSelectMarkerPosition } from '../components/map.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
+function getAgeSelectValue(age) {
+    if (typeof age === 'string') {
+        const trimmed = age.trim();
+        const validOptions = ["Sıfır (Yeni)", "1-5 Yıl", "6-10 Yıl", "11-15 Yıl", "16-20 Yıl", "21-25 Yıl", "26-30 Yıl", "31 Yıl ve Üzeri"];
+        if (validOptions.includes(trimmed)) return trimmed;
+    }
+    const num = Number(age);
+    if (isNaN(num) || num <= 0) return "Sıfır (Yeni)";
+    if (num <= 5) return "1-5 Yıl";
+    if (num <= 10) return "6-10 Yıl";
+    if (num <= 15) return "11-15 Yıl";
+    if (num <= 20) return "16-20 Yıl";
+    if (num <= 25) return "21-25 Yıl";
+    if (num <= 30) return "26-30 Yıl";
+    return "31 Yıl ve Üzeri";
+}
+
 let activeFilters = {
     search: '',
     type: 'Hepsi',
@@ -874,15 +891,39 @@ function openAddPortfolioModal() {
             <div class="form-group-three">
                 <div class="form-group">
                     <label for="p-age">Bina Yaşı</label>
-                    <input type="number" id="p-age" placeholder="Bina yaşı...">
+                    <select id="p-age">
+                        <option value="Sıfır (Yeni)">Sıfır (Yeni)</option>
+                        <option value="1-5 Yıl">1-5 Yıl</option>
+                        <option value="6-10 Yıl">6-10 Yıl</option>
+                        <option value="11-15 Yıl">11-15 Yıl</option>
+                        <option value="16-20 Yıl">16-20 Yıl</option>
+                        <option value="21-25 Yıl">21-25 Yıl</option>
+                        <option value="26-30 Yıl">26-30 Yıl</option>
+                        <option value="31 Yıl ve Üzeri">31 Yıl ve Üzeri</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="p-heating">Isınma</label>
-                    <input type="text" id="p-heating" value="Doğalgaz (Kombi)">
+                    <select id="p-heating">
+                        <option value="Doğalgaz (Kombi)">Doğalgaz (Kombi)</option>
+                        <option value="Merkezi Sistem">Merkezi Sistem</option>
+                        <option value="Merkezi (Pay Ölçer)">Merkezi (Pay Ölçer)</option>
+                        <option value="Yerden Isıtma">Yerden Isıtma</option>
+                        <option value="Klima">Klima</option>
+                        <option value="Isı Pompası">Isı Pompası</option>
+                        <option value="Yok">Yok</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="p-title-status">Tapu Durumu</label>
-                    <input type="text" id="p-title-status" value="Kat Mülkiyeti">
+                    <select id="p-title-status">
+                        <option value="Kat Mülkiyeti">Kat Mülkiyeti</option>
+                        <option value="Kat İrtifakı">Kat İrtifakı</option>
+                        <option value="Arsa Tapulu">Arsa Tapulu</option>
+                        <option value="Hisseli Tapu">Hisseli Tapu</option>
+                        <option value="Milli Emlak">Milli Emlak</option>
+                        <option value="İntikalli">İntikalli</option>
+                    </select>
                 </div>
             </div>
             
@@ -967,9 +1008,9 @@ function openAddPortfolioModal() {
             status: document.getElementById('p-status').value,
             imageUrl: document.getElementById('p-image').value.trim() || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=500&auto=format&fit=crop&q=60',
             commission: Number(document.getElementById('p-commission').value) || 0,
-            age: Number(document.getElementById('p-age').value) || 0,
-            heating: document.getElementById('p-heating').value.trim(),
-            titleStatus: document.getElementById('p-title-status').value.trim(),
+            age: document.getElementById('p-age').value,
+            heating: document.getElementById('p-heating').value,
+            titleStatus: document.getElementById('p-title-status').value,
             notes: document.getElementById('p-notes').value.trim(),
             latitude: tempCoordinates.lat,
             longitude: tempCoordinates.lng,
@@ -1094,15 +1135,39 @@ function openEditPortfolioModal(p) {
             <div class="form-group-three">
                 <div class="form-group">
                     <label for="pe-age">Bina Yaşı</label>
-                    <input type="number" id="pe-age" value="${p.age || 0}">
+                    <select id="pe-age">
+                        <option value="Sıfır (Yeni)" ${getAgeSelectValue(p.age) === 'Sıfır (Yeni)' ? 'selected' : ''}>Sıfır (Yeni)</option>
+                        <option value="1-5 Yıl" ${getAgeSelectValue(p.age) === '1-5 Yıl' ? 'selected' : ''}>1-5 Yıl</option>
+                        <option value="6-10 Yıl" ${getAgeSelectValue(p.age) === '6-10 Yıl' ? 'selected' : ''}>6-10 Yıl</option>
+                        <option value="11-15 Yıl" ${getAgeSelectValue(p.age) === '11-15 Yıl' ? 'selected' : ''}>11-15 Yıl</option>
+                        <option value="16-20 Yıl" ${getAgeSelectValue(p.age) === '16-20 Yıl' ? 'selected' : ''}>16-20 Yıl</option>
+                        <option value="21-25 Yıl" ${getAgeSelectValue(p.age) === '21-25 Yıl' ? 'selected' : ''}>21-25 Yıl</option>
+                        <option value="26-30 Yıl" ${getAgeSelectValue(p.age) === '26-30 Yıl' ? 'selected' : ''}>26-30 Yıl</option>
+                        <option value="31 Yıl ve Üzeri" ${getAgeSelectValue(p.age) === '31 Yıl ve Üzeri' ? 'selected' : ''}>31 Yıl ve Üzeri</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="pe-heating">Isınma</label>
-                    <input type="text" id="pe-heating" value="${p.heating || 'Doğalgaz (Kombi)'}">
+                    <select id="pe-heating">
+                        <option value="Doğalgaz (Kombi)" ${p.heating === 'Doğalgaz (Kombi)' ? 'selected' : ''}>Doğalgaz (Kombi)</option>
+                        <option value="Merkezi Sistem" ${p.heating === 'Merkezi Sistem' ? 'selected' : ''}>Merkezi Sistem</option>
+                        <option value="Merkezi (Pay Ölçer)" ${p.heating === 'Merkezi (Pay Ölçer)' ? 'selected' : ''}>Merkezi (Pay Ölçer)</option>
+                        <option value="Yerden Isıtma" ${p.heating === 'Yerden Isıtma' ? 'selected' : ''}>Yerden Isıtma</option>
+                        <option value="Klima" ${p.heating === 'Klima' ? 'selected' : ''}>Klima</option>
+                        <option value="Isı Pompası" ${p.heating === 'Isı Pompası' ? 'selected' : ''}>Isı Pompası</option>
+                        <option value="Yok" ${p.heating === 'Yok' ? 'selected' : ''}>Yok</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="pe-title-status">Tapu Durumu</label>
-                    <input type="text" id="pe-title-status" value="${p.titleStatus || 'Kat Mülkiyeti'}">
+                    <select id="pe-title-status">
+                        <option value="Kat Mülkiyeti" ${p.titleStatus === 'Kat Mülkiyeti' ? 'selected' : ''}>Kat Mülkiyeti</option>
+                        <option value="Kat İrtifakı" ${p.titleStatus === 'Kat İrtifakı' ? 'selected' : ''}>Kat İrtifakı</option>
+                        <option value="Arsa Tapulu" ${p.titleStatus === 'Arsa Tapulu' ? 'selected' : ''}>Arsa Tapulu</option>
+                        <option value="Hisseli Tapu" ${p.titleStatus === 'Hisseli Tapu' ? 'selected' : ''}>Hisseli Tapu</option>
+                        <option value="Milli Emlak" ${p.titleStatus === 'Milli Emlak' ? 'selected' : ''}>Milli Emlak</option>
+                        <option value="İntikalli" ${p.titleStatus === 'İntikalli' ? 'selected' : ''}>İntikalli</option>
+                    </select>
                 </div>
             </div>
             
@@ -1191,9 +1256,9 @@ function openEditPortfolioModal(p) {
             status: document.getElementById('pe-status').value,
             imageUrl: document.getElementById('pe-image').value.trim(),
             commission: Number(document.getElementById('pe-commission').value) || 0,
-            age: Number(document.getElementById('pe-age').value) || 0,
-            heating: document.getElementById('pe-heating').value.trim(),
-            titleStatus: document.getElementById('pe-title-status').value.trim(),
+            age: document.getElementById('pe-age').value,
+            heating: document.getElementById('pe-heating').value,
+            titleStatus: document.getElementById('pe-title-status').value,
             notes: document.getElementById('pe-notes').value.trim(),
             latitude: tempCoordinates.lat,
             longitude: tempCoordinates.lng,
