@@ -3,10 +3,12 @@ PROJECTCRM - routes/data.py
 Genel CRUD rotaları: portfolios, customers, meetings, todos, activities, deals.
 """
 
+import os
 import uuid
 import json
 import datetime
-from flask import Blueprint, request, session, jsonify
+from flask import Blueprint, request, session, jsonify, current_app
+from werkzeug.utils import secure_filename
 from db import db_connection
 from auth_middleware import login_required
 
@@ -307,3 +309,73 @@ def create_customer_alias():
 @login_required
 def update_customer_alias(id):
     return update_data_record('customers', id)
+
+
+@data_bp.route('/api/portfolios/upload', methods=['POST'])
+@login_required
+def upload_portfolio_image():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "Yüklenecek dosya bulunamadı."}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "Dosya seçilmedi."}), 400
+
+        # Extension check
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+        if ext not in allowed_extensions:
+            return jsonify({"error": "Sadece resim dosyaları (.png, .jpg, .jpeg, .webp, .gif) yüklenebilir."}), 400
+
+        # Limit size to 10MB
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        if file_size > 10 * 1024 * 1024:
+            return jsonify({"error": "Maksimum dosya boyutu 10MB olmalıdır."}), 400
+
+        # Try saving to the configured upload folder
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', '/data/uploads')
+        
+        try:
+            target_dir = os.path.join(upload_folder, 'portfolios')
+            os.makedirs(target_dir, exist_ok=True)
+            # Test write
+            test_file = os.path.join(target_dir, '.write_test')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+        except Exception:
+            # Fallback to local static/uploads/portfolios
+            upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads')
+            current_app.config['UPLOAD_FOLDER'] = upload_folder
+            target_dir = os.path.join(upload_folder, 'portfolios')
+            os.makedirs(target_dir, exist_ok=True)
+
+        unique_filename = f"{uuid.uuid4().hex[:12]}_{secure_filename(file.filename)}"
+        # Sanity: ensure filename is safe and has the original or generic extension
+        if not unique_filename.endswith(f".{ext}"):
+            unique_filename = f"{unique_filename}.{ext}"
+
+        file_path = os.path.join(target_dir, unique_filename)
+        
+        try:
+            file.save(file_path)
+        except Exception as e:
+            # Absolute fallback to local static folder if anything failed
+            upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads')
+            current_app.config['UPLOAD_FOLDER'] = upload_folder
+            target_dir = os.path.join(upload_folder, 'portfolios')
+            os.makedirs(target_dir, exist_ok=True)
+            file_path = os.path.join(target_dir, unique_filename)
+            file.save(file_path)
+
+        # The relative URL path that static_routes.py serves:
+        # /uploads/portfolios/<filename>
+        relative_url = f"/uploads/portfolios/{unique_filename}"
+        
+        return jsonify({"success": True, "url": relative_url})
+
+    except Exception as e:
+        return jsonify({"error": f"Yükleme hatası: {str(e)}"}), 500

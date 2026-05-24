@@ -881,6 +881,14 @@ function openAddPortfolioModal() {
                 <div class="form-group">
                     <label for="p-image">Fotoğraf URL</label>
                     <input type="text" id="p-image" placeholder="Görsel linkini yapıştırın...">
+                    <div class="upload-safeguard-container" style="margin-top: 8px;">
+                        <label for="portfolio-file" class="file-upload-label" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(99, 102, 241, 0.15); border: 1px dashed #6366f1; border-radius: 6px; color: #a5b4fc; font-size: 12px; cursor: pointer; transition: all 0.2s ease;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span>Görsel Yükle</span>
+                        </label>
+                        <input type="file" id="portfolio-file" accept="image/*" style="display: none;">
+                        <span id="p-upload-status" style="font-size: 11px; margin-left: 8px; display: inline-block; vertical-align: middle;"></span>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="p-commission">Komisyon Oranı (%)</label>
@@ -975,6 +983,49 @@ function openAddPortfolioModal() {
     `;
     
     openModal("Yeni İlan Girişi", content);
+    
+    // Setup File Upload Safeguard Listener
+    const fileInput = document.getElementById('portfolio-file');
+    const imageInput = document.getElementById('p-image');
+    const statusSpan = document.getElementById('p-upload-status');
+    if (fileInput && imageInput && statusSpan) {
+        fileInput.addEventListener('change', async () => {
+            if (!fileInput.files || !fileInput.files[0]) return;
+            const file = fileInput.files[0];
+            
+            // Check size locally (10MB limit)
+            if (file.size > 10 * 1024 * 1024) {
+                showToast("Hata: Dosya boyutu 10MB'tan küçük olmalıdır.", "error");
+                statusSpan.innerHTML = `<span style="color:#ef4444; font-weight: 500;">Limit Aşımı (Max 10MB)</span>`;
+                return;
+            }
+            
+            statusSpan.innerHTML = `<span style="color:#818cf8; font-weight: 500;">Resim yükleniyor...</span>`;
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await apiFetch('/api/portfolios/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || "Sunucu yükleme hatası.");
+                }
+                
+                imageInput.value = result.url;
+                statusSpan.innerHTML = `<span style="color:#10b981; font-weight: 500;">✓ Yüklendi</span>`;
+                showToast("Görsel başarıyla yüklendi.", "success");
+            } catch (err) {
+                console.error("Image upload failed:", err);
+                statusSpan.innerHTML = `<span style="color:#ef4444; font-weight: 500;">Yükleme Hatası</span>`;
+                showToast(`Dosya yükleme sunucu hatası nedeniyle başarısız oldu. Lütfen resmi manuel URL olarak girin.`, "error");
+            }
+        });
+    }
     
     // Map Location Picker Trigger
     document.getElementById('btn-select-location').addEventListener('click', (e) => {
@@ -1125,6 +1176,14 @@ function openEditPortfolioModal(p) {
                 <div class="form-group">
                     <label for="pe-image">Fotoğraf URL</label>
                     <input type="text" id="pe-image" value="${p.imageUrl}">
+                    <div class="upload-safeguard-container" style="margin-top: 8px;">
+                        <label for="portfolio-file" class="file-upload-label" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(99, 102, 241, 0.15); border: 1px dashed #6366f1; border-radius: 6px; color: #a5b4fc; font-size: 12px; cursor: pointer; transition: all 0.2s ease;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span>Görsel Değiştir/Yükle</span>
+                        </label>
+                        <input type="file" id="portfolio-file" accept="image/*" style="display: none;">
+                        <span id="pe-upload-status" style="font-size: 11px; margin-left: 8px; display: inline-block; vertical-align: middle;"></span>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="pe-commission">Komisyon Oranı (%)</label>
@@ -1216,6 +1275,49 @@ function openEditPortfolioModal(p) {
     `;
     
     openModal("İlan Düzenleme", content);
+    
+    // Setup File Upload Safeguard Listener
+    const fileInput = document.getElementById('portfolio-file');
+    const imageInput = document.getElementById('pe-image');
+    const statusSpan = document.getElementById('pe-upload-status');
+    if (fileInput && imageInput && statusSpan) {
+        fileInput.addEventListener('change', async () => {
+            if (!fileInput.files || !fileInput.files[0]) return;
+            const file = fileInput.files[0];
+            
+            // Check size locally (10MB limit)
+            if (file.size > 10 * 1024 * 1024) {
+                showToast("Hata: Dosya boyutu 10MB'tan küçük olmalıdır.", "error");
+                statusSpan.innerHTML = `<span style="color:#ef4444; font-weight: 500;">Limit Aşımı (Max 10MB)</span>`;
+                return;
+            }
+            
+            statusSpan.innerHTML = `<span style="color:#818cf8; font-weight: 500;">Resim yükleniyor...</span>`;
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await apiFetch('/api/portfolios/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || "Sunucu yükleme hatası.");
+                }
+                
+                imageInput.value = result.url;
+                statusSpan.innerHTML = `<span style="color:#10b981; font-weight: 500;">✓ Yüklendi</span>`;
+                showToast("Görsel başarıyla güncellendi.", "success");
+            } catch (err) {
+                console.error("Image upload failed:", err);
+                statusSpan.innerHTML = `<span style="color:#ef4444; font-weight: 500;">Yükleme Hatası</span>`;
+                showToast(`Dosya yükleme sunucu hatası nedeniyle başarısız oldu. Lütfen resmi manuel URL olarak girin.`, "error");
+            }
+        });
+    }
     
     // Position select pin initially on edit map
     setTimeout(() => {

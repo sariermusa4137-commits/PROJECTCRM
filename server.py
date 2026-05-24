@@ -38,10 +38,20 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # ------------------------------------------------------------------ #
 try:
     os.makedirs('/data/uploads/profiles', exist_ok=True)
+    os.makedirs('/data/uploads/portfolios', exist_ok=True)
+    test_path = '/data/uploads/test_write.txt'
+    with open(test_path, 'w') as f:
+        f.write('test')
+    os.remove(test_path)
     UPLOAD_BASE_DIR = '/data/uploads'
-except (PermissionError, OSError):
+except (PermissionError, OSError, Exception) as e:
+    print(f"Render persistent storage error or permission issue: {e}. Falling back to local upload folder.", flush=True)
     UPLOAD_BASE_DIR = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
-    os.makedirs(os.path.join(UPLOAD_BASE_DIR, 'profiles'), exist_ok=True)
+    try:
+        os.makedirs(os.path.join(UPLOAD_BASE_DIR, 'profiles'), exist_ok=True)
+        os.makedirs(os.path.join(UPLOAD_BASE_DIR, 'portfolios'), exist_ok=True)
+    except Exception as ex:
+        print(f"Error creating local upload directory: {ex}", flush=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_BASE_DIR
 
