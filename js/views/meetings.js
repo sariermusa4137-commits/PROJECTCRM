@@ -192,19 +192,30 @@ async function renderCalendar() {
     
     const gridContainer = document.getElementById('calendar-grid-days-container');
     
-    // 1. Render empty cells before first day of month
-    for (let i = 0; i < adjustedFirstDay; i++) {
-        const emptyCell = document.createElement('div');
-        emptyCell.className = 'calendar-day empty';
-        gridContainer.appendChild(emptyCell);
+    // 1. Render days from the previous month to fill the first week
+    const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const prevMonthVal = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevMonthDays = new Date(prevMonthYear, prevMonthVal + 1, 0).getDate();
+    
+    for (let i = adjustedFirstDay - 1; i >= 0; i--) {
+        const dayNum = prevMonthDays - i;
+        const dayCell = document.createElement('div');
+        dayCell.className = 'calendar-day other-month';
+        dayCell.innerHTML = `<span class="calendar-day-num">${dayNum}</span>`;
+        gridContainer.appendChild(dayCell);
     }
+    
+    // Get today's local date string
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     
     // 2. Render actual day cells
     for (let day = 1; day <= daysInMonth; day++) {
-        const dayCell = document.createElement('div');
-        dayCell.className = 'calendar-day';
-        
         const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === todayStr;
+        
+        const dayCell = document.createElement('div');
+        dayCell.className = `calendar-day${isToday ? ' today' : ''}`;
         
         // Filter events on this date
         const dayEvents = events.filter(e => e.start === dateStr);
@@ -227,7 +238,7 @@ async function renderCalendar() {
                     else if (isContract) cleanClass = 'sozlesme-bitisi';
                     else if (isAnniv) cleanClass = 'mulk-yildonumu';
                     else if (e.type) {
-                        cleanClass = e.type.toLowerCase().replace(/\s+/g, '-').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ı/g,'i').replace(/ğ/g,'g');
+                        cleanClass = e.type.toLowerCase().replace(/\s+/g, '-').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u').replace(/ç/g,'c').replace(/ı/g,'i').replace(/ğ/g,'g');
                     }
                     
                     const styleAttr = (e.backgroundColor && e.textColor) 
@@ -257,6 +268,16 @@ async function renderCalendar() {
             }
         });
         
+        gridContainer.appendChild(dayCell);
+    }
+
+    // 3. Render days from the next month to complete the 42-cell (6 weeks x 7 days) structure
+    const renderedCellsCount = adjustedFirstDay + daysInMonth;
+    const remainingCellsCount = 42 - renderedCellsCount;
+    for (let day = 1; day <= remainingCellsCount; day++) {
+        const dayCell = document.createElement('div');
+        dayCell.className = 'calendar-day other-month';
+        dayCell.innerHTML = `<span class="calendar-day-num">${day}</span>`;
         gridContainer.appendChild(dayCell);
     }
     
