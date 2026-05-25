@@ -228,6 +228,20 @@ def init_db():
             )
         ''')
 
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS financial_rates (
+                rate_key TEXT PRIMARY KEY,
+                rate_value REAL,
+                last_updated TEXT
+            )
+        ''')
+
+        cursor.execute("SELECT COUNT(*) FROM financial_rates")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO financial_rates (rate_key, rate_value, last_updated) VALUES ('mevduat_faizi', 50.0, datetime('now'))")
+            cursor.execute("INSERT INTO financial_rates (rate_key, rate_value, last_updated) VALUES ('altin_getiri', 45.0, datetime('now'))")
+
+
         # ------------------------------------------------------------------ #
         # Güvenli Kolon Migration (ALTER TABLE IF NOT EXISTS pattern)          #
         # ------------------------------------------------------------------ #

@@ -112,6 +112,8 @@ for blueprint in ALL_BLUEPRINTS:
 # ------------------------------------------------------------------ #
 with app.app_context():
     init_db()
+    from routes.analytics import start_rates_fetcher
+    start_rates_fetcher()
     # Şifre sıfırlama migration (kalıcı disk bağlantısı için)
     try:
         with db_connection() as conn:
