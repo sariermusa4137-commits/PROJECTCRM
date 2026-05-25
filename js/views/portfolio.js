@@ -299,7 +299,7 @@ function openPortfolioDetailModal(p) {
                     <img src="${p.imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=500&auto=format&fit=crop&q=60'}" class="detail-img" alt="Mülk Resmi">
                     <div style="margin-top:16px;">
                         <h4 style="margin-bottom:8px;">Danışman Notları</h4>
-                        <p style="font-size:13px; color:var(--text-secondary); line-height:1.6; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:var(--border-radius-md);">${p.notes || "Not eklenmemiş."}</p>
+                        <p style="font-size:13px; color:var(--text-secondary); line-height:1.6; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:var(--border-radius-md); white-space: pre-wrap; word-wrap: break-word;">${p.notes || "Not eklenmemiş."}</p>
                     </div>
                     
                     <!-- Matching Buyers Section -->
