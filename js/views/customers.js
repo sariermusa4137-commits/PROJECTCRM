@@ -35,6 +35,48 @@ export function renderCustomersView(container) {
             <button class="tab-btn ${activeTab === 'seller' ? 'active' : ''}" data-tab="seller">Satıcılar (Mülk Sahipleri)</button>
         </div>
         
+        <!-- Filter Bar -->
+        <div class="card filter-bar" style="margin-bottom: 20px; padding: 16px; background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: flex-end;">
+                <!-- Search Box -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter-search" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Müşteri İsim / Tel</label>
+                    <input type="text" id="filter-search" placeholder="İsim, soyisim veya telefon..." style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                </div>
+                <!-- Talep Tipi (Status Preference) -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter-status-pref" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Talep Tipi (Alıcı)</label>
+                    <select id="filter-status-pref" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                        <option value="All">Hepsi</option>
+                        <option value="Satılık">Satılık</option>
+                        <option value="Kiralık">Kiralık</option>
+                        <option value="Hem Satılık Hem Kiralık">Hem Satılık Hem Kiralık</option>
+                    </select>
+                </div>
+                <!-- Mülk Tipi (Search Property Type) -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter-prop-type" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Mülk Tipi (Alıcı)</label>
+                    <select id="filter-prop-type" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                        <option value="All">Hepsi</option>
+                        <option value="Daire">Daire</option>
+                        <option value="Villa">Villa</option>
+                        <option value="Arsa">Arsa</option>
+                        <option value="Ticari">Ticari</option>
+                    </select>
+                </div>
+                <!-- Budget Min -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter-budget-min" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Min Bütçe (TL)</label>
+                    <input type="number" id="filter-budget-min" placeholder="Min TL" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                </div>
+                <!-- Budget Max -->
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="filter-budget-max" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Max Bütçe (TL)</label>
+                    <input type="number" id="filter-budget-max" placeholder="Max TL" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                </div>
+            </div>
+        </div>
+        
         <!-- Customer Table -->
         <div class="card" style="padding:0; overflow:hidden;">
             <div class="table-responsive">
@@ -59,6 +101,23 @@ export function renderCustomersView(container) {
     `;
     
     updateCustomerTable();
+    
+    // Bind Filter Panel Listeners
+    const filterSearch = document.getElementById('filter-search');
+    const filterStatusPref = document.getElementById('filter-status-pref');
+    const filterPropType = document.getElementById('filter-prop-type');
+    const filterBudgetMin = document.getElementById('filter-budget-min');
+    const filterBudgetMax = document.getElementById('filter-budget-max');
+
+    const handleFilterInput = () => {
+        updateCustomerTable();
+    };
+
+    if (filterSearch) filterSearch.addEventListener('input', handleFilterInput);
+    if (filterStatusPref) filterStatusPref.addEventListener('change', handleFilterInput);
+    if (filterPropType) filterPropType.addEventListener('change', handleFilterInput);
+    if (filterBudgetMin) filterBudgetMin.addEventListener('input', handleFilterInput);
+    if (filterBudgetMax) filterBudgetMax.addEventListener('input', handleFilterInput);
     
     // Tab event listeners
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -140,18 +199,70 @@ function updateCustomerTable() {
     const tableBody = document.getElementById('customer-table-body');
     if (!tableBody) return;
     
+    // Get filter element values
+    const filterSearch = document.getElementById('filter-search');
+    const filterStatusPref = document.getElementById('filter-status-pref');
+    const filterPropType = document.getElementById('filter-prop-type');
+    const filterBudgetMin = document.getElementById('filter-budget-min');
+    const filterBudgetMax = document.getElementById('filter-budget-max');
+    
+    const query = filterSearch ? filterSearch.value.trim().toLowerCase() : '';
+    const statusPref = filterStatusPref ? filterStatusPref.value : 'All';
+    const propType = filterPropType ? filterPropType.value : 'All';
+    
+    const minBudget = (filterBudgetMin && filterBudgetMin.value) ? parseFloat(filterBudgetMin.value) : null;
+    const maxBudget = (filterBudgetMax && filterBudgetMax.value) ? parseFloat(filterBudgetMax.value) : null;
+    
     // Filter customers
     const filtered = state.customers.filter(c => {
-        if (activeTab === 'buyer') return c.type === 'Alıcı';
-        if (activeTab === 'seller') return c.type === 'Satıcı';
-        return true; // all
+        // Tab filtering
+        if (activeTab === 'buyer' && c.type !== 'Alıcı') return false;
+        if (activeTab === 'seller' && c.type !== 'Satıcı') return false;
+        
+        // Search filter (name, phone, email)
+        if (query) {
+            const nameMatch = c.name ? c.name.toLowerCase().includes(query) : false;
+            const phoneMatch = c.phone ? c.phone.toLowerCase().includes(query) : false;
+            const emailMatch = c.email ? c.email.toLowerCase().includes(query) : false;
+            if (!nameMatch && !phoneMatch && !emailMatch) return false;
+        }
+        
+        // Status Preference (Talep Tipi) filter
+        if (statusPref !== 'All') {
+            const pref = c.status_preference || '';
+            if (statusPref === 'Satılık') {
+                if (pref !== 'Satılık' && pref !== 'Hem Satılık Hem Kiralık') return false;
+            } else if (statusPref === 'Kiralık') {
+                if (pref !== 'Kiralık' && pref !== 'Hem Satılık Hem Kiralık') return false;
+            } else if (statusPref === 'Hem Satılık Hem Kiralık') {
+                if (pref !== 'Hem Satılık Hem Kiralık') return false;
+            }
+        }
+        
+        // Property Type (Mülk Tipi) filter
+        if (propType !== 'All') {
+            const type = c.searchPropertyType || '';
+            if (type !== propType) return false;
+        }
+        
+        // Budget filters
+        const budget = parseFloat(c.budget) || 0;
+        if (minBudget !== null && budget < minBudget) return false;
+        if (maxBudget !== null && budget > maxBudget) return false;
+        
+        return true;
     });
     
     if (filtered.length === 0) {
+        const isFilterActive = query || statusPref !== 'All' || propType !== 'All' || minBudget !== null || maxBudget !== null;
+        const emptyMessage = isFilterActive 
+            ? "Arama kriterlerine uygun müşteri bulunamadı." 
+            : "Kayıtlı müşteri bulunmamaktadır.";
+            
         tableBody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">
-                    Kayıtlı müşteri bulunmamaktadır.
+                    ${emptyMessage}
                 </td>
             </tr>
         `;
