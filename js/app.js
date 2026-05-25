@@ -12,6 +12,7 @@ import { renderDealsView } from './views/deals.js';
 import { renderProfileView } from './views/profile.js';
 import { renderUsersView } from './views/users.js';
 import { renderReportsView } from './views/reports.js';
+import { renderRemindersView } from './views/reminders.js';
 import { showToast, openModal, closeModal } from './components/ui.js';
 
 // DOM Elements
@@ -170,6 +171,7 @@ function handleRouting() {
             profile: "Profilim",
             users: "Danışman Kadrosu",
             reports: "Ciro Raporu",
+            reminders: "Anımsatıcılar",
             forbidden: "Erişim Engellendi"
         };
         breadcrumbActive.textContent = viewTitles[viewName] || viewName.toUpperCase();
@@ -230,6 +232,9 @@ function renderActiveView(viewName) {
             break;
         case "reports":
             renderReportsView(appView);
+            break;
+        case "reminders":
+            renderRemindersView(appView);
             break;
         case "forbidden":
             appView.innerHTML = `

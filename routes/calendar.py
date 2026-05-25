@@ -65,6 +65,24 @@ def get_calendar_events():
                     )
             meetings = cursor.fetchall()
 
+            # Anımsatıcıları (reminders) çek
+            if role == 'admin':
+                if agency_id:
+                    cursor.execute('SELECT * FROM reminders WHERE agencyId = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""', (agency_id,))
+                else:
+                    cursor.execute('SELECT * FROM reminders WHERE is_completed = 0 AND due_date IS NOT NULL AND due_date != ""')
+            else:
+                if agency_id:
+                    cursor.execute(
+                        'SELECT * FROM reminders WHERE agencyId = ? AND createdById = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""',
+                        (agency_id, current_user_id)
+                    )
+                else:
+                    cursor.execute(
+                        'SELECT * FROM reminders WHERE createdById = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""', (current_user_id,)
+                    )
+            reminders = cursor.fetchall()
+
         events = []
 
         # Olağan görüşmeler
@@ -78,6 +96,19 @@ def get_calendar_events():
                 "customerName": m['customerName'] or "",
                 "notes": m['notes'] or "",
                 "kanbanStage": m['kanbanStage'] or "İlk Temas"
+            })
+
+        # Anımsatıcıları takvime ekle
+        for r in reminders:
+            events.append({
+                "id": f"reminder_{r['id']}",
+                "title": f"🔔 {r['title']}",
+                "start": r['due_date'],
+                "backgroundColor": "#e0f2fe", # light sky blue
+                "textColor": "#0369a1", # dark blue
+                "allDay": True,
+                "type": "Anımsatıcı",
+                "notes": r['description'] or ""
             })
 
         # Dinamik yıl — hardcode'dan kurtulma

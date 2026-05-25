@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Dashboard / Gösterge Paneli Görünümü
 
-import { state, addRecord, updateRecord, deleteRecord, getApproachingBirthdays, getApproachingContractExpirations } from '../store.js';
+import { state, getApproachingBirthdays, getApproachingContractExpirations } from '../store.js';
 import { showToast } from '../components/ui.js';
 
 // Simple date formatter
@@ -44,7 +44,7 @@ export function renderDashboardView(container) {
     
     // Pending tasks count
     const contractExpirations = getApproachingContractExpirations();
-    const pendingTodos = state.todos.filter(t => !t.completed).length + contractExpirations.length;
+    const pendingTodos = state.reminders.filter(r => !r.is_completed).length + contractExpirations.length;
     
     // 2. Fetch approaching birthdays
     const birthdays = getApproachingBirthdays();
@@ -97,29 +97,7 @@ export function renderDashboardView(container) {
             `).join('');
         }
         
-        // Update Todos
-        const todoList = container.querySelector('.todo-list');
-        if (todoList) {
-            todoList.innerHTML = (contractExpirations.length === 0 && state.todos.length === 0) ? `
-                <p style="color:var(--text-muted); font-size:13px; text-align:center; padding-top:40px;">Yapılacak iş kalmadı!</p>
-            ` : `
-                ${contractWarningsHtml}
-                ${state.todos.map(todo => `
-                    <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
-                        <div class="todo-left">
-                            <div class="todo-checkbox ${todo.completed ? 'checked' : ''}">
-                                ${todo.completed ? '✓' : ''}
-                            </div>
-                            <span class="todo-text">${todo.task}</span>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <span class="todo-meta">${todo.assignedToName || 'Atanmamış'}</span>
-                            <button class="todo-delete" data-id="${todo.id}">&times;</button>
-                        </div>
-                    </div>
-                `).join('')}
-            `;
-        }
+        // Todos card is removed from dashboard view
         
         // Update Birthdays
         const birthdayList = container.querySelector('.birthday-list');
@@ -167,7 +145,6 @@ export function renderDashboardView(container) {
             `).join('');
         }
         
-        setupTodoListeners(container);
         setupBirthdayListeners(container);
         return;
     }
@@ -242,37 +219,7 @@ export function renderDashboardView(container) {
                     </div>
                 </div>
                 
-                <!-- Task List Card -->
-                <div class="card todo-card">
-                    <h3>Yapılacaklar Listesi</h3>
-                    
-                    <form id="form-todo-add" class="todo-input-row">
-                        <input type="text" id="input-todo-text" placeholder="Yeni bir görev yazın ve Enter'a basın..." required>
-                        <button type="submit" class="btn btn-primary">Ekle</button>
-                    </form>
-                    
-                    <div class="todo-list">
-                        ${(contractExpirations.length === 0 && state.todos.length === 0) ? `
-                            <p style="color:var(--text-muted); font-size:13px; text-align:center; padding-top:40px;">Yapılacak iş kalmadı!</p>
-                        ` : `
-                            ${contractWarningsHtml}
-                            ${state.todos.map(todo => `
-                                <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
-                                    <div class="todo-left">
-                                        <div class="todo-checkbox ${todo.completed ? 'checked' : ''}">
-                                            ${todo.completed ? '✓' : ''}
-                                        </div>
-                                        <span class="todo-text">${todo.task}</span>
-                                    </div>
-                                    <div style="display:flex; align-items:center; gap:12px;">
-                                        <span class="todo-meta">${todo.assignedToName || 'Atanmamış'}</span>
-                                        <button class="todo-delete" data-id="${todo.id}">&times;</button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        `}
-                    </div>
-                </div>
+
                 
             </div>
             
@@ -342,9 +289,6 @@ export function renderDashboardView(container) {
         </div>
     `;
     
-    // Add Event Listeners for Todos
-    setupTodoListeners(container);
-    
     // Add Event Listeners for Birthdays
     setupBirthdayListeners(container);
 }
@@ -383,74 +327,7 @@ function formatBirthdayDate(dateString) {
     }
 }
 
-// Setup Event Listeners for To-Do tasks
-function setupTodoListeners(container) {
-    if (!container) return;
-    
-    // Add Todo
-    const formTodo = container.querySelector('#form-todo-add');
-    if (formTodo && !formTodo.dataset.listenerAttached) {
-        formTodo.dataset.listenerAttached = 'true';
-        formTodo.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const input = container.querySelector('#input-todo-text');
-            const task = input ? input.value.trim() : '';
-            
-            if (task) {
-                try {
-                    await addRecord('todos', {
-                        task: task,
-                        completed: false,
-                        dueDate: new Date().toISOString().split('T')[0]
-                    });
-                    if (input) input.value = '';
-                    showToast("Görev başarıyla eklendi.", "success");
-                } catch (err) {
-                    showToast("Görev eklenirken hata: " + err.message, "error");
-                }
-            }
-        });
-    }
-    
-    // Use event delegation on todo-list
-    const todoList = container.querySelector('.todo-list');
-    if (todoList && !todoList.dataset.listenerAttached) {
-        todoList.dataset.listenerAttached = 'true';
-        todoList.addEventListener('click', async (e) => {
-            // Toggle/Complete Todo
-            const box = e.target.closest('.todo-checkbox');
-            if (box) {
-                const item = box.closest('.todo-item');
-                if (item) {
-                    const id = item.dataset.id;
-                    const completed = !box.classList.contains('checked');
-                    try {
-                        await updateRecord('todos', id, { completed: completed });
-                        showToast(completed ? "Görev tamamlandı." : "Görev geri alındı.", "info");
-                    } catch (err) {
-                        showToast("Görev güncellenirken hata: " + err.message, "error");
-                    }
-                }
-                return;
-            }
-            
-            // Delete Todo
-            const deleteBtn = e.target.closest('.todo-delete');
-            if (deleteBtn) {
-                const id = deleteBtn.dataset.id;
-                if (id && confirm("Bu görevi silmek istediğinize emin misiniz?")) {
-                    try {
-                        await deleteRecord('todos', id);
-                        showToast("Görev silindi.", "success");
-                    } catch (err) {
-                        showToast("Görev silinirken hata: " + err.message, "error");
-                    }
-                }
-                return;
-            }
-        });
-    }
-}
+
 
 // Setup Event Listeners for Birthdays (Tebrik Et Button)
 function setupBirthdayListeners(container) {

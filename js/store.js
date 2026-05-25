@@ -17,6 +17,7 @@ export const state = {
     deals: [],
     regionNews: [],
     opportunities: [],
+    reminders: [],
     
     // Callbacks for UI updates
     listeners: new Set()
@@ -75,6 +76,16 @@ export async function fetchAllData(agencyId) {
     } catch (e) {
         console.error("Matchmaking opportunities fetch failed:", e);
     }
+
+    let remindersData = [];
+    try {
+        const remindersRes = await apiFetch(`/api/reminders`);
+        if (remindersRes.ok) {
+            remindersData = await remindersRes.json();
+        }
+    } catch (e) {
+        console.error("Reminders fetch failed:", e);
+    }
     
     // Check if anything has actually changed in the caches to prevent layout thrashing and focus loss
     const changed = JSON.stringify(state.portfolios) !== JSON.stringify(data.portfolios) ||
@@ -84,7 +95,8 @@ export async function fetchAllData(agencyId) {
                     JSON.stringify(state.activities) !== JSON.stringify(data.activities) ||
                     JSON.stringify(state.deals) !== JSON.stringify(data.deals) ||
                     JSON.stringify(state.locations) !== JSON.stringify(data.locations) ||
-                    JSON.stringify(state.opportunities) !== JSON.stringify(matchmakingData);
+                    JSON.stringify(state.opportunities) !== JSON.stringify(matchmakingData) ||
+                    JSON.stringify(state.reminders) !== JSON.stringify(remindersData);
                     
     if (changed) {
         state.portfolios = (data.portfolios || []).map(item => syncFields('portfolios', item));
@@ -95,6 +107,7 @@ export async function fetchAllData(agencyId) {
         state.deals = (data.deals || []).map(item => syncFields('deals', item));
         state.locations = (data.locations || []).map(item => syncFields('locations', item));
         state.opportunities = matchmakingData || [];
+        state.reminders = remindersData || [];
         notify();
     }
 }
@@ -205,6 +218,7 @@ export async function logout() {
     state.deals = [];
     state.locations = [];
     state.opportunities = [];
+    state.reminders = [];
     notify();
 }
 
@@ -417,6 +431,66 @@ export async function deleteRecord(collectionName, id) {
     state[collectionName] = state[collectionName].filter(item => item.id !== id);
     
     await logActivity(`"${title}" silindi.`);
+    notify();
+}
+
+// ----------------- REMINDERS CRUD ACTIONS -----------------
+
+// Create Reminder
+export async function addReminder(reminder) {
+    if (!state.agency) throw new Error("Acente bilgisi bulunamadı.");
+    const res = await apiFetch('/api/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reminder)
+    });
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Anımsatıcı eklenemedi.");
+    }
+    const newReminder = await res.json();
+    state.reminders.unshift(newReminder);
+    
+    await logActivity(`"${newReminder.title}" anımsatıcısı eklendi.`);
+    notify();
+    return newReminder;
+}
+
+// Update Reminder
+export async function updateReminder(id, fields) {
+    const res = await apiFetch(`/api/reminders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields)
+    });
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Anımsatıcı güncellenemedi.");
+    }
+    const updatedReminder = await res.json();
+    const index = state.reminders.findIndex(item => item.id === id);
+    if (index !== -1) {
+        state.reminders[index] = updatedReminder;
+        notify();
+    }
+    return updatedReminder;
+}
+
+// Delete Reminder
+export async function deleteReminder(id) {
+    const reminder = state.reminders.find(item => item.id === id);
+    let title = reminder ? reminder.title : "anımsatıcı";
+    
+    const res = await apiFetch(`/api/reminders/${id}`, {
+        method: 'DELETE'
+    });
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Anımsatıcı silinemedi.");
+    }
+    state.reminders = state.reminders.filter(item => item.id !== id);
+    
+    await logActivity(`"${title}" anımsatıcısı silindi.`);
     notify();
 }
 

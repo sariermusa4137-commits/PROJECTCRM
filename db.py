@@ -241,6 +241,20 @@ def init_db():
             cursor.execute("INSERT INTO financial_rates (rate_key, rate_value, last_updated) VALUES ('mevduat_faizi', 50.0, datetime('now'))")
             cursor.execute("INSERT INTO financial_rates (rate_key, rate_value, last_updated) VALUES ('altin_getiri', 45.0, datetime('now'))")
 
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reminders (
+                id TEXT PRIMARY KEY,
+                agencyId TEXT,
+                createdById TEXT,
+                title TEXT NOT NULL,
+                description TEXT,
+                due_date TEXT,
+                is_completed INTEGER DEFAULT 0,
+                category TEXT,
+                created_at TEXT
+            )
+        ''')
+
 
         # ------------------------------------------------------------------ #
         # Güvenli Kolon Migration (ALTER TABLE IF NOT EXISTS pattern)          #
