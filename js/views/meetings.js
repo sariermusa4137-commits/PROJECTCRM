@@ -241,9 +241,10 @@ async function renderCalendar() {
                         cleanClass = e.type.toLowerCase().replace(/\s+/g, '-').replace(/ü/g,'u').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u').replace(/ç/g,'c').replace(/ı/g,'i').replace(/ğ/g,'g');
                     }
                     
-                    const styleAttr = (e.backgroundColor && e.textColor) 
-                        ? `style="background: ${e.backgroundColor}; color: ${e.textColor}; border: 1px solid rgba(255,255,255,0.05);"`
-                        : '';
+                    let styleAttr = '';
+                    if (e.textColor) {
+                        styleAttr = `style="border-left-color: ${e.textColor} !important;"`;
+                    }
                     
                     return `
                         <span class="calendar-event-pill ${cleanClass}" data-id="${e.id}" ${styleAttr} title="${e.title}">
