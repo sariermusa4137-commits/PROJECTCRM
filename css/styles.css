@@ -1075,6 +1075,45 @@ textarea {
     min-width: 150px;
 }
 
+/* Customer View Filter Bar */
+.customer-filter-card {
+    background: rgba(15, 23, 42, 0.45) !important; /* Integrated premium dark-mode card tone */
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.customer-filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+    width: 100%;
+}
+
+.customer-filter-group {
+    flex: 1;
+    min-width: 180px;
+    margin-bottom: 0 !important;
+}
+
+.customer-filter-control {
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    height: 38px !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: var(--border-radius-md) !important;
+    width: 100% !important;
+    transition: all var(--transition-fast) !important;
+}
+
+.customer-filter-control:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px var(--primary-glow) !important;
+    background: rgba(15, 23, 42, 0.85) !important;
+    outline: none !important;
+}
+
 .portfolio-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;

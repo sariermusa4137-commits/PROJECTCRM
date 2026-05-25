@@ -36,17 +36,17 @@ export function renderCustomersView(container) {
         </div>
         
         <!-- Filter Bar -->
-        <div class="card filter-bar" style="margin-bottom: 20px; padding: 16px; background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color);">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: flex-end;">
+        <div class="card filter-bar customer-filter-card" style="margin-bottom: 20px; padding: 16px;">
+            <div class="customer-filter-container">
                 <!-- Search Box -->
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group customer-filter-group">
                     <label for="filter-search" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Müşteri İsim / Tel</label>
-                    <input type="text" id="filter-search" placeholder="İsim, soyisim veya telefon..." style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                    <input type="text" id="filter-search" placeholder="İsim, soyisim veya telefon..." class="customer-filter-control">
                 </div>
                 <!-- Talep Tipi (Status Preference) -->
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group customer-filter-group">
                     <label for="filter-status-pref" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Talep Tipi (Alıcı)</label>
-                    <select id="filter-status-pref" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                    <select id="filter-status-pref" class="customer-filter-control">
                         <option value="All">Hepsi</option>
                         <option value="Satılık">Satılık</option>
                         <option value="Kiralık">Kiralık</option>
@@ -54,9 +54,9 @@ export function renderCustomersView(container) {
                     </select>
                 </div>
                 <!-- Mülk Tipi (Search Property Type) -->
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group customer-filter-group">
                     <label for="filter-prop-type" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Mülk Tipi (Alıcı)</label>
-                    <select id="filter-prop-type" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                    <select id="filter-prop-type" class="customer-filter-control">
                         <option value="All">Hepsi</option>
                         <option value="Daire">Daire</option>
                         <option value="Villa">Villa</option>
@@ -65,14 +65,14 @@ export function renderCustomersView(container) {
                     </select>
                 </div>
                 <!-- Budget Min -->
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group customer-filter-group">
                     <label for="filter-budget-min" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Min Bütçe (TL)</label>
-                    <input type="number" id="filter-budget-min" placeholder="Min TL" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                    <input type="number" id="filter-budget-min" placeholder="Min TL" class="customer-filter-control">
                 </div>
                 <!-- Budget Max -->
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group customer-filter-group">
                     <label for="filter-budget-max" style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary); display: block; font-weight: 600;">Max Bütçe (TL)</label>
-                    <input type="number" id="filter-budget-max" placeholder="Max TL" style="padding: 8px 12px; font-size: 13px; height: 38px; background: rgba(15, 23, 42, 0.6); color: white; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: 100%;">
+                    <input type="number" id="filter-budget-max" placeholder="Max TL" class="customer-filter-control">
                 </div>
             </div>
         </div>
