@@ -1678,8 +1678,9 @@ textarea {
 }
 
 .calendar-grid-header {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    width: 100% !important;
     gap: 8px;
     text-align: center;
     font-size: 11px;
@@ -1691,22 +1692,23 @@ textarea {
 }
 
 .calendar-grid-days {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    width: 100% !important;
     gap: 8px;
 }
 
 .calendar-day {
-    min-height: 110px;
-    height: 100%;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    min-height: 90px !important;
+    padding: 6px !important;
+    box-sizing: border-box !important;
     border: 1px solid rgba(255, 255, 255, 0.04);
     background: rgba(30, 41, 59, 0.2);
     border-radius: var(--border-radius-md);
-    padding: 8px 6px;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
     transition: all var(--transition-fast) ease-in-out;
     position: relative;
     cursor: pointer;
@@ -1727,51 +1729,66 @@ textarea {
 
 .calendar-day.today {
     background: rgba(30, 41, 59, 0.3) !important;
-    border: 1px solid rgba(14, 165, 233, 0.35) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
     box-shadow: none !important;
     border-radius: var(--border-radius-md) !important;
 }
 
 .calendar-day-num {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-primary);
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 6px auto;
+    margin-left: auto;
+    margin-bottom: 4px;
+    border-radius: 50%;
+    box-sizing: border-box;
     transition: all var(--transition-fast);
 }
 
 .calendar-day.today .calendar-day-num {
-    background-color: #0ea5e9;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background-color: #0ea5e9 !important;
     color: #ffffff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    margin-left: auto !important;
+    margin-bottom: 4px !important;
 }
 
 .calendar-day-events {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    width: 100%;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    padding: 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     overflow: visible;
 }
 
 .calendar-event-pill {
-    background-color: rgba(14, 165, 233, 0.1);
-    border-left: 3px solid #0ea5e9;
-    padding: 4px 8px;
-    margin-top: 4px;
-    border-radius: 4px;
-    color: #e2e8f0;
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12px;
-    font-weight: 500;
+    background: rgba(14, 165, 233, 0.12) !important;
+    border-left: 3px solid #0ea5e9 !important;
+    color: #e2e8f0 !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    display: block !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     transition: transform 0.1s ease, filter 0.1s ease;
 }
 
@@ -1780,9 +1797,9 @@ textarea {
     filter: brightness(1.1);
 }
 
-.calendar-event-pill.arama { background-color: rgba(245, 158, 11, 0.1) !important; border-left: 3px solid #f59e0b !important; color: #ffedd5 !important; }
-.calendar-event-pill.yuz-yuze { background-color: rgba(99, 102, 241, 0.1) !important; border-left: 3px solid #6366f1 !important; color: #e0e7ff !important; }
-.calendar-event-pill.gosterim { background-color: rgba(16, 185, 129, 0.1) !important; border-left: 3px solid #10b981 !important; color: #d1fae5 !important; }
+.calendar-event-pill.arama { background: rgba(245, 158, 11, 0.12) !important; border-left: 3px solid #f59e0b !important; color: #ffedd5 !important; }
+.calendar-event-pill.yuz-yuze { background: rgba(99, 102, 241, 0.12) !important; border-left: 3px solid #6366f1 !important; color: #e0e7ff !important; }
+.calendar-event-pill.gosterim { background: rgba(16, 185, 129, 0.12) !important; border-left: 3px solid #10b981 !important; color: #d1fae5 !important; }
 
 /* Locations View Styling */
 .locations-grid {
@@ -2219,19 +2236,19 @@ textarea {
 
 /* Calendar Birthday Event Pill */
 .calendar-event-pill.dogum-gunu {
-    background-color: rgba(244, 143, 177, 0.1) !important;
+    background: rgba(244, 143, 177, 0.12) !important;
     color: #fce7f3 !important;
     border-left: 3px solid #f472b6 !important;
 }
 
 .calendar-event-pill.sozlesme-bitisi {
-    background-color: rgba(249, 115, 22, 0.1) !important;
+    background: rgba(249, 115, 22, 0.12) !important;
     color: #ffedd5 !important;
     border-left: 3px solid #ea580c !important;
 }
 
 .calendar-event-pill.mulk-yildonumu {
-    background-color: rgba(16, 185, 129, 0.1) !important;
+    background: rgba(16, 185, 129, 0.12) !important;
     color: #d1fae5 !important;
     border-left: 3px solid #10b981 !important;
 }
