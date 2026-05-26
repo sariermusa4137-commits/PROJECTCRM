@@ -287,6 +287,9 @@ function openPortfolioDetailModal(p) {
     const formatComm = p.commission ? `%${p.commission}` : "-";
     const matchingBuyers = getMatchesForPortfolio(p);
     
+    const owner = state.customers.find(c => c.id === p.owner_id);
+    const ownerName = owner ? owner.name : "-";
+    
     const content = `
         <div class="tabs" style="margin-bottom: 20px;">
             <button class="tab-btn active" id="tab-btn-general" style="font-size: 13px;">Genel Bilgiler</button>
@@ -391,6 +394,10 @@ function openPortfolioDetailModal(p) {
                             <span class="spec-entry-label">Mülk Durumu</span>
                             <span class="spec-entry-value">${p.mulk_durumu || "-"}</span>
                         </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Mülk Sahibi</span>
+                            <span class="spec-entry-value">${owner ? `<span class="client-type-badge satici" style="cursor:pointer; margin-top:2px;" id="view-portfolio-owner-btn" data-id="${owner.id}">${ownerName}</span>` : "-"}</span>
+                        </div>
                         <div class="spec-entry" style="grid-column: span 2;">
                             <span class="spec-entry-label">Tapu Durumu Notları</span>
                             <span class="spec-entry-value">${p.tapu_durumu_notlari || "-"}</span>
@@ -429,6 +436,17 @@ function openPortfolioDetailModal(p) {
     `;
     
     openModal(p.title, content);
+    
+    // View Owner click handler
+    const viewOwnerBtn = document.getElementById('view-portfolio-owner-btn');
+    if (viewOwnerBtn) {
+        viewOwnerBtn.addEventListener('click', () => {
+            const ownerId = viewOwnerBtn.dataset.id;
+            state.autoOpenCustomerId = ownerId;
+            closeModal();
+            window.location.hash = "#customers";
+        });
+    }
     
     // Tab Switching functionality
     const tabBtnGeneral = document.getElementById('tab-btn-general');
@@ -958,6 +976,20 @@ function openAddPortfolioModal() {
             </div>
             
             <div class="form-group">
+                <label for="p-owner-search">Mülk Sahibi / Satıcı</label>
+                <div style="display: flex; gap: 8px; align-items: center; position: relative;">
+                    <div style="flex: 1; position: relative;">
+                        <input type="text" id="p-owner-search" placeholder="Mülk Sahibi ara (İsim veya Telefon)..." autocomplete="off" style="width: 100%;">
+                        <input type="hidden" id="p-owner-id" value="">
+                        <div id="p-owner-autocomplete-results" class="autocomplete-results-container hidden">
+                            <!-- Dynamic Search Results -->
+                        </div>
+                    </div>
+                    <button type="button" id="btn-add-quick-owner" class="btn btn-outline" style="padding: 10px 14px; font-weight: bold; font-size: 16px; line-height: 1;" title="Yeni Mal Sahibi Ekle">+</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
                 <label for="p-tapu-notlari">Tapu Durumu Notları</label>
                 <textarea id="p-tapu-notlari" placeholder="İpotek, Şerh, Hisseli vb. için açıklamalar..." style="min-height:60px;"></textarea>
             </div>
@@ -983,6 +1015,9 @@ function openAddPortfolioModal() {
     `;
     
     openModal("Yeni İlan Girişi", content);
+    
+    // Setup Autocomplete and Quick Add Owner
+    setupOwnerAutocompleteAndQuickAdd('p');
     
     // Setup File Upload Safeguard Listener
     const fileInput = document.getElementById('portfolio-file');
@@ -1071,7 +1106,8 @@ function openAddPortfolioModal() {
             tapu_durumu_notlari: document.getElementById('p-tapu-notlari').value.trim(),
             current_rent: Number(document.getElementById('p-rent').value) || 0,
             annual_growth_estimate: Number(document.getElementById('p-growth').value) || 15,
-            inflation_estimate: 25
+            inflation_estimate: 25,
+            owner_id: document.getElementById('p-owner-id').value || ""
         };
         
         try {
@@ -1088,6 +1124,8 @@ function openAddPortfolioModal() {
 // Edit Portfolio Modal Form
 function openEditPortfolioModal(p) {
     tempCoordinates = { lat: p.latitude || 40.9800, lng: p.longitude || 29.0800 };
+    const owner = state.customers.find(c => c.id === p.owner_id);
+    const ownerName = owner ? owner.name : "";
     
     const content = `
         <form id="form-portfolio-edit">
@@ -1253,6 +1291,20 @@ function openEditPortfolioModal(p) {
             </div>
             
             <div class="form-group">
+                <label for="pe-owner-search">Mülk Sahibi / Satıcı</label>
+                <div style="display: flex; gap: 8px; align-items: center; position: relative;">
+                    <div style="flex: 1; position: relative;">
+                        <input type="text" id="pe-owner-search" placeholder="Mülk Sahibi ara (İsim veya Telefon)..." autocomplete="off" style="width: 100%;" value="${ownerName}">
+                        <input type="hidden" id="pe-owner-id" value="${p.owner_id || ''}">
+                        <div id="pe-owner-autocomplete-results" class="autocomplete-results-container hidden">
+                            <!-- Dynamic Search Results -->
+                        </div>
+                    </div>
+                    <button type="button" id="btn-edit-quick-owner" class="btn btn-outline" style="padding: 10px 14px; font-weight: bold; font-size: 16px; line-height: 1;" title="Yeni Mal Sahibi Ekle">+</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
                 <label for="pe-tapu-notlari">Tapu Durumu Notları</label>
                 <textarea id="pe-tapu-notlari" placeholder="İpotek, Şerh, Hisseli vb. için açıklamalar..." style="min-height:60px;">${p.tapu_durumu_notlari || ''}</textarea>
             </div>
@@ -1275,6 +1327,9 @@ function openEditPortfolioModal(p) {
     `;
     
     openModal("İlan Düzenleme", content);
+    
+    // Setup Autocomplete and Quick Add Owner
+    setupOwnerAutocompleteAndQuickAdd('pe');
     
     // Setup File Upload Safeguard Listener
     const fileInput = document.getElementById('portfolio-file');
@@ -1370,7 +1425,8 @@ function openEditPortfolioModal(p) {
             tapu_durumu_notlari: document.getElementById('pe-tapu-notlari').value.trim(),
             current_rent: Number(document.getElementById('pe-rent').value) || 0,
             annual_growth_estimate: Number(document.getElementById('pe-growth').value) || 15,
-            inflation_estimate: p.inflation_estimate || 25
+            inflation_estimate: p.inflation_estimate || 25,
+            owner_id: document.getElementById('pe-owner-id').value || ""
         };
         
         try {
@@ -1381,5 +1437,140 @@ function openEditPortfolioModal(p) {
         } catch (err) {
             showToast("Güncelleme hatası: " + err.message, "error");
         }
+    });
+}
+
+function setupOwnerAutocompleteAndQuickAdd(prefix) {
+    const ownerSearch = document.getElementById(`${prefix}-owner-search`);
+    const ownerIdInput = document.getElementById(`${prefix}-owner-id`);
+    const autocompleteResults = document.getElementById(`${prefix}-owner-autocomplete-results`);
+    const quickOwnerBtn = document.getElementById(`btn-${prefix === 'p' ? 'add' : 'edit'}-quick-owner`);
+
+    if (!ownerSearch || !ownerIdInput || !autocompleteResults || !quickOwnerBtn) return;
+
+    ownerSearch.addEventListener('input', () => {
+        const val = ownerSearch.value.trim().toLowerCase();
+        if (!val) {
+            autocompleteResults.classList.add('hidden');
+            return;
+        }
+        const matches = state.customers.filter(c => {
+            const nameMatch = c.name ? c.name.toLowerCase().includes(val) : false;
+            const phoneMatch = c.phone ? c.phone.toLowerCase().includes(val) : false;
+            return nameMatch || phoneMatch;
+        });
+
+        if (matches.length === 0) {
+            autocompleteResults.innerHTML = `<div style="padding: 10px; font-size:12px; color:var(--text-muted); text-align:center;">Müşteri bulunamadı</div>`;
+        } else {
+            autocompleteResults.innerHTML = matches.map(c => {
+                const clientType = c.client_type || (c.type === 'Satıcı' ? 'Satıcı/Mülk Sahibi' : 'Alıcı');
+                return `
+                    <div class="autocomplete-item" data-id="${c.id}" data-name="${c.name}">
+                        <strong>${c.name}</strong>
+                        <span class="autocomplete-item-sub">${clientType} | ${c.phone}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        autocompleteResults.classList.remove('hidden');
+    });
+
+    const clickOutsideHandler = (ev) => {
+        if (!ownerSearch.contains(ev.target) && !autocompleteResults.contains(ev.target)) {
+            autocompleteResults.classList.add('hidden');
+        }
+    };
+    document.addEventListener('click', clickOutsideHandler);
+
+    autocompleteResults.addEventListener('click', (ev) => {
+        const item = ev.target.closest('.autocomplete-item');
+        if (item) {
+            ownerSearch.value = item.dataset.name;
+            ownerIdInput.value = item.dataset.id;
+            autocompleteResults.classList.add('hidden');
+        }
+    });
+
+    quickOwnerBtn.addEventListener('click', () => {
+        const miniModal = document.createElement('div');
+        miniModal.id = 'mini-modal-quick-owner';
+        miniModal.style.position = 'fixed';
+        miniModal.style.top = '0';
+        miniModal.style.left = '0';
+        miniModal.style.width = '100vw';
+        miniModal.style.height = '100vh';
+        miniModal.style.background = 'rgba(0, 0, 0, 0.7)';
+        miniModal.style.display = 'flex';
+        miniModal.style.alignItems = 'center';
+        miniModal.style.justifyContent = 'center';
+        miniModal.style.zIndex = '9999';
+
+        miniModal.innerHTML = `
+            <div class="card" style="width: 90%; max-width: 450px; padding: 24px; border: 1px solid var(--border-color); background: var(--bg-card); position: relative; box-shadow: var(--shadow-lg);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                    <h3 style="margin:0;">Hızlı Mal Sahibi Ekle</h3>
+                    <button type="button" id="btn-close-quick-owner" style="background:transparent; border:none; color:var(--text-muted); font-size:20px; cursor:pointer;">&times;</button>
+                </div>
+                <form id="form-quick-owner">
+                    <div class="form-group">
+                        <label>Adı Soyadı</label>
+                        <input type="text" id="qo-name" placeholder="Müşteri adı soyadı..." required style="width: 100%;">
+                    </div>
+                    <div class="form-group">
+                        <label>Telefon</label>
+                        <input type="text" id="qo-phone" placeholder="Telefon numarası..." required style="width: 100%;">
+                    </div>
+                    <div class="form-group">
+                        <label>E-posta</label>
+                        <input type="email" id="qo-email" placeholder="E-posta adresi..." style="width: 100%;">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full" style="margin-top:16px;">Müşteriyi Kaydet</button>
+                </form>
+            </div>
+        `;
+
+        document.body.appendChild(miniModal);
+
+        const closeQO = () => {
+            miniModal.remove();
+        };
+        document.getElementById('btn-close-quick-owner').addEventListener('click', closeQO);
+        miniModal.addEventListener('click', (e) => {
+            if (e.target === miniModal) closeQO();
+        });
+
+        document.getElementById('form-quick-owner').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const qoName = document.getElementById('qo-name').value.trim();
+            const qoPhone = document.getElementById('qo-phone').value.trim();
+            const qoEmail = document.getElementById('qo-email').value.trim();
+
+            const record = {
+                name: qoName,
+                phone: qoPhone,
+                email: qoEmail,
+                type: 'Satıcı',
+                client_type: 'Satıcı/Mülk Sahibi',
+                status: 'aktif',
+                lifecycle_stage: 'Potansiyel',
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                await addRecord('customers', record);
+                const newCust = state.customers.find(cust => cust.phone === qoPhone);
+                if (newCust) {
+                    ownerSearch.value = newCust.name;
+                    ownerIdInput.value = newCust.id;
+                } else {
+                    ownerSearch.value = qoName;
+                }
+                showToast("Yeni mal sahibi başarıyla oluşturuldu.", "success");
+                closeQO();
+            } catch (err) {
+                showToast("Mal sahibi kaydedilirken hata: " + err.message, "error");
+            }
+        });
     });
 }

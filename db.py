@@ -115,7 +115,8 @@ def init_db():
                 tapu_durumu_notlari TEXT,
                 current_rent REAL DEFAULT 0,
                 annual_growth_estimate REAL DEFAULT 15,
-                inflation_estimate REAL DEFAULT 25
+                inflation_estimate REAL DEFAULT 25,
+                owner_id TEXT
             )
         ''')
 
@@ -148,7 +149,8 @@ def init_db():
                 mulk_durumu TEXT,
                 tapu_durumu_notlari TEXT,
                 status TEXT DEFAULT 'aktif',
-                status_preference TEXT DEFAULT 'Satılık'
+                status_preference TEXT DEFAULT 'Satılık',
+                client_type TEXT DEFAULT 'Alıcı'
             )
         ''')
 
@@ -275,6 +277,8 @@ def init_db():
             ("portfolios", "current_rent", "REAL DEFAULT 0"),
             ("portfolios", "annual_growth_estimate", "REAL DEFAULT 15"),
             ("portfolios", "inflation_estimate", "REAL DEFAULT 25"),
+            ("customers", "client_type", "TEXT DEFAULT 'Alıcı'"),
+            ("portfolios", "owner_id", "TEXT"),
         ]
         for table, col, col_type in alter_queries:
             try:
@@ -290,6 +294,10 @@ def init_db():
             cursor.execute("UPDATE portfolios SET current_rent = 0 WHERE current_rent IS NULL")
             cursor.execute("UPDATE portfolios SET annual_growth_estimate = 15 WHERE annual_growth_estimate IS NULL")
             cursor.execute("UPDATE portfolios SET inflation_estimate = 25 WHERE inflation_estimate IS NULL")
+            
+            # Legacy updates for client_type
+            cursor.execute("UPDATE customers SET client_type = 'Alıcı' WHERE client_type IS NULL OR client_type = ''")
+            cursor.execute("UPDATE customers SET client_type = 'Satıcı/Mülk Sahibi' WHERE type = 'Satıcı'")
         except sqlite3.OperationalError:
             pass
 

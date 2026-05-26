@@ -3063,4 +3063,60 @@ textarea {
     font-size: 12px;
 }
 
+/* Autocomplete results dropdown styles */
+.autocomplete-results-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #0b0f19 !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius-sm) !important;
+    z-index: 1000 !important;
+    max-height: 200px !important;
+    overflow-y: auto !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+}
+
+.autocomplete-item {
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    color: var(--text-primary) !important;
+    transition: background 0.15s ease !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02) !important;
+}
+
+.autocomplete-item:hover {
+    background: rgba(99, 102, 241, 0.15) !important;
+}
+
+.autocomplete-item-sub {
+    font-size: 11px !important;
+    color: var(--text-secondary) !important;
+    display: block !important;
+    margin-top: 2px !important;
+}
+
+/* Client Type Badges */
+.client-type-badge {
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    display: inline-block !important;
+}
+
+.client-type-badge.alici {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #10b981 !important;
+}
+
+.client-type-badge.satici {
+    background: rgba(168, 85, 247, 0.15) !important;
+    color: #c084fc !important;
+}
+
 

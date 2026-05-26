@@ -183,6 +183,18 @@ export function renderCustomersView(container) {
     document.getElementById('btn-add-customer').addEventListener('click', () => {
         openAddCustomerModal();
     });
+    
+    // Auto open details if state.autoOpenCustomerId is set
+    if (state.autoOpenCustomerId) {
+        const autoId = state.autoOpenCustomerId;
+        state.autoOpenCustomerId = null;
+        const client = state.customers.find(cust => cust.id === autoId);
+        if (client) {
+            setTimeout(() => {
+                openCustomerDetailModal(client);
+            }, 150);
+        }
+    }
 }
 
 function getStatusLabel(status) {
@@ -216,8 +228,9 @@ function updateCustomerTable() {
     // Filter customers
     const filtered = state.customers.filter(c => {
         // Tab filtering
-        if (activeTab === 'buyer' && c.type !== 'Alıcı') return false;
-        if (activeTab === 'seller' && c.type !== 'Satıcı') return false;
+        const cType = c.client_type || (c.type === 'Satıcı' ? 'Satıcı/Mülk Sahibi' : 'Alıcı');
+        if (activeTab === 'buyer' && cType !== 'Alıcı') return false;
+        if (activeTab === 'seller' && cType !== 'Satıcı/Mülk Sahibi') return false;
         
         // Search filter (name, phone, email)
         if (query) {
@@ -281,13 +294,16 @@ function updateCustomerTable() {
         
         const displayPhone = canViewPhone(c) ? c.phone : maskPhoneNumber(c.phone) + ' <span style="font-size:10px;" title="Diğer danışmanların müşteri numaralarını göremezsiniz.">🔒</span>';
         
+        const clientType = c.client_type || (c.type === 'Satıcı' ? 'Satıcı/Mülk Sahibi' : 'Alıcı');
+        const badgeClass = clientType === 'Satıcı/Mülk Sahibi' ? 'satici' : 'alici';
+        
         return `
             <tr class="customer-row" data-id="${c.id}">
                 <td style="font-weight:600;">${c.name}</td>
                 <td>${displayPhone}</td>
                 <td>
-                    <span class="portfolio-type-badge ${c.type === 'Alıcı' ? 'satilik' : 'kiralik'}">
-                        ${c.type}
+                    <span class="client-type-badge ${badgeClass}">
+                        ${clientType}
                     </span>
                 </td>
                 <td>
@@ -352,6 +368,11 @@ async function updateLifecycleStage(c, newStage) {
 function openCustomerDetailModal(c) {
     const formattedBudget = c.budget ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(c.budget) : "-";
     const matches = getMatchesForCustomer(c);
+    
+    const clientType = c.client_type || (c.type === 'Satıcı' ? 'Satıcı/Mülk Sahibi' : 'Alıcı');
+    const ownerPortfolios = (clientType === 'Satıcı/Mülk Sahibi' || c.type === 'Satıcı') 
+        ? state.portfolios.filter(p => p.owner_id === c.id) 
+        : [];
     
     // Sort meetings chronologically (newest first)
     const clientMeetings = state.meetings
@@ -468,7 +489,7 @@ function openCustomerDetailModal(c) {
                     </div>
                     <div class="spec-entry">
                         <span class="spec-entry-label">Müşteri Tipi</span>
-                        <span class="spec-entry-value">${c.type}</span>
+                        <span class="spec-entry-value">${clientType}</span>
                     </div>
                     ${c.type === 'Alıcı' ? `
                         <div class="spec-entry">
@@ -545,6 +566,29 @@ function openCustomerDetailModal(c) {
                                         <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${p.district || p.bolge || ''}, ${p.rooms || p.oda_sayisi || ''} | ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(p.price || p.fiyat)}</span>
                                     </div>
                                     <button class="btn btn-primary btn-view-p" data-id="${p.id}" style="padding:6px 12px; font-size:11px;">İlana Git</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Owned Portfolios (For Sellers / Property Owners) -->
+                ${(clientType === 'Satıcı/Mülk Sahibi' || c.type === 'Satıcı') ? `
+                    <div style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
+                        <h4 style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>Mülk Sahibine Ait Portföyler</span>
+                            <span class="kanban-column-count">${ownerPortfolios.length}</span>
+                        </h4>
+                        <div class="owned-list" style="margin-top: 10px; display:flex; flex-direction:column; gap:8px;">
+                            ${ownerPortfolios.length === 0 ? `
+                                <p style="font-size:12px; color:var(--text-muted);">Müşteriye ait aktif portföy bulunmamaktadır.</p>
+                            ` : ownerPortfolios.map(p => `
+                                <div class="match-item" style="background:rgba(168, 85, 247, 0.08); border:1px solid rgba(168, 85, 247, 0.2); padding:10px; border-radius:var(--border-radius-sm); display:flex; justify-content:space-between; align-items:center;">
+                                    <div class="match-client-info" style="display:flex; flex-direction:column;">
+                                        <span class="match-name" style="font-size:12px; font-weight:600; color:var(--text-primary);">${p.title}</span>
+                                        <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${p.district || p.bolge || ''}, ${p.rooms || p.oda_sayisi || ''} | ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(p.price || p.fiyat)}</span>
+                                    </div>
+                                    <button class="btn btn-primary btn-view-p-owner" data-id="${p.id}" style="padding:6px 12px; font-size:11px; background: #a855f7; border-color: #a855f7;">İlana Git</button>
                                 </div>
                             `).join('')}
                         </div>
@@ -662,6 +706,23 @@ function openCustomerDetailModal(c) {
                     setTimeout(() => {
                         window.location.hash = "#portfolio";
                         showToast(`Seçilen ilan listelendi.`, "info");
+                    }, 100);
+                });
+            }
+        });
+    });
+    
+    // Go to owned portfolio listing
+    const viewOwnerBtns = document.querySelectorAll('.match-item .btn-view-p-owner');
+    viewOwnerBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const pid = btn.dataset.id;
+            const property = state.portfolios.find(p => p.id === pid);
+            if (property) {
+                closeModal();
+                import('./portfolio.js').then(module => {
+                    setTimeout(() => {
+                        window.location.hash = "#portfolio";
                     }, 100);
                 });
             }
@@ -899,6 +960,7 @@ function openAddCustomerModal() {
             birthDate: document.getElementById('c-birth').value,
             birth_date: document.getElementById('c-birth').value,
             type: type,
+            client_type: type === 'Satıcı' ? 'Satıcı/Mülk Sahibi' : 'Alıcı',
             status: document.getElementById('c-status').value,
             budget: type === 'Alıcı' ? (Number(document.getElementById('c-budget').value) || 0) : 0,
             searchPropertyType: type === 'Alıcı' ? document.getElementById('c-prop-type').value : "",
@@ -1132,6 +1194,7 @@ function openEditCustomerModal(c) {
             birthDate: document.getElementById('ce-birth').value,
             birth_date: document.getElementById('ce-birth').value,
             type: type,
+            client_type: type === 'Satıcı' ? 'Satıcı/Mülk Sahibi' : 'Alıcı',
             status: document.getElementById('ce-status').value,
             budget: type === 'Alıcı' ? (Number(document.getElementById('ce-budget').value) || 0) : 0,
             searchPropertyType: type === 'Alıcı' ? document.getElementById('ce-prop-type').value : "",
