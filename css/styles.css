@@ -1128,6 +1128,20 @@ textarea {
     gap: 32px;
 }
 
+.portfolio-layout.map-hidden {
+    grid-template-columns: 1fr !important;
+}
+
+.portfolio-layout.map-hidden .portfolio-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+}
+
+@media (max-width: 768px) {
+    .portfolio-layout.map-hidden .portfolio-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 @media (max-width: 1024px) {
     .portfolio-layout {
         grid-template-columns: 1fr;

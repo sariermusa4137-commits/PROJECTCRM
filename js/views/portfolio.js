@@ -1,7 +1,7 @@
 // Gayrimenkul CRM - Portföy Yönetimi ve Harita Görünümü
 
 import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, canViewPhone, maskPhoneNumber, apiFetch, canDelete, canEditRecord } from '../store.js';
-import { initMap, renderPortfolioMarkers, enableLocationSelection, setSelectMarkerPosition } from '../components/map.js';
+import { initMap, renderPortfolioMarkers } from '../components/map.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
 function getAgeSelectValue(age) {
@@ -20,6 +20,11 @@ function getAgeSelectValue(age) {
     if (num <= 30) return "26-30 Yıl";
     return "31 Yıl ve Üzeri";
 }
+
+let isMapVisible = false;
+let listMapInstance = null;
+let formMapInstance = null;
+let formMarker = null;
 
 function getFullLocationString(p) {
     let city = p.city;
@@ -57,6 +62,10 @@ export function renderPortfolioView(container) {
                 <p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Ekibinizin eklediği tüm ilanlar ve harita dağılımı.</p>
             </div>
             <div style="display:flex; gap:12px; align-items:center;">
+                <button id="btn-toggle-map" class="btn btn-outline" style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-md"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span id="toggle-map-text">Haritada Göster</span>
+                </button>
                 <button id="btn-export-excel" class="btn btn-excel">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-md"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8M8 9h1"/></svg>
                     Excel Olarak İndir
@@ -95,7 +104,7 @@ export function renderPortfolioView(container) {
         </div>
         
         <!-- Side-by-Side Content Grid -->
-        <div class="portfolio-layout">
+        <div class="portfolio-layout map-hidden">
             <!-- Left: Portfolio Cards -->
             <div class="portfolio-list-pane">
                 <div class="portfolio-grid" id="portfolio-list-container">
@@ -104,15 +113,54 @@ export function renderPortfolioView(container) {
             </div>
             
             <!-- Right: Leaflet Map -->
-            <div class="map-pane">
+            <div class="map-pane hidden">
                 <div id="map-container"></div>
             </div>
         </div>
     `;
     
-    // Initialize Map on container load
+    isMapVisible = false;
+    
+    const btnToggleMap = document.getElementById('btn-toggle-map');
+    const layout = container.querySelector('.portfolio-layout');
+    const mapPane = container.querySelector('.map-pane');
+    
+    function updateMapVisibility() {
+        const toggleMapText = document.getElementById('toggle-map-text');
+        if (!toggleMapText) return;
+        
+        if (isMapVisible) {
+            layout.classList.remove('map-hidden');
+            mapPane.classList.remove('hidden');
+            toggleMapText.textContent = "Listede Göster";
+            
+            const mapContainerEl = document.getElementById('map-container');
+            if (mapContainerEl && !listMapInstance) {
+                listMapInstance = initMap('map-container');
+                updatePortfolioList();
+            } else if (listMapInstance) {
+                setTimeout(() => {
+                    listMapInstance.invalidateSize();
+                }, 100);
+                updatePortfolioList();
+            }
+        } else {
+            layout.classList.add('map-hidden');
+            mapPane.classList.add('hidden');
+            toggleMapText.textContent = "Haritada Göster";
+        }
+    }
+    
+    if (btnToggleMap) {
+        btnToggleMap.addEventListener('click', () => {
+            isMapVisible = !isMapVisible;
+            updateMapVisibility();
+        });
+    }
+    
+    updateMapVisibility();
+    
     setTimeout(() => {
-        initMap('map-container');
         updatePortfolioList();
     }, 100);
     
@@ -1038,13 +1086,10 @@ async function openAddPortfolioModal() {
             </div>
             
             <div class="form-group">
-                <label>Haritada Konum Seçimi</label>
-                <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
-                    <button type="button" id="btn-select-location" class="btn btn-outline" style="font-size:12px; padding:8px 12px;">Haritadan Konum Seç (Aktif et)</button>
-                    <span id="coord-indicator" style="font-size:11px; color:var(--text-secondary);">Varsayılan: Kadıköy</span>
-                </div>
-                <div style="font-size:10px; color:var(--text-muted);">
-                    Butona bastıktan sonra arkadaki haritaya tıklayarak mülkün yerini işaretleyebilirsiniz.
+                <label>Mülk Konumu (Haritada İşaretleyin)</label>
+                <div id="form-map-container" style="width: 100%; height: 250px; border-radius: var(--border-radius-md); border: 1px solid var(--border-color); margin-bottom: 8px; position: relative; overflow: hidden; background: #111;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span id="coord-indicator" style="font-size:11px; color:var(--text-secondary);">Enlem/Boylam seçilmedi</span>
                 </div>
             </div>
             
@@ -1108,20 +1153,8 @@ async function openAddPortfolioModal() {
         });
     }
     
-    // Map Location Picker Trigger
-    document.getElementById('btn-select-location').addEventListener('click', (e) => {
-        e.target.textContent = "Haritaya Tıklayarak İşaretleyin...";
-        e.target.classList.add('btn-secondary');
-        
-        enableLocationSelection((lat, lng) => {
-            tempCoordinates = { lat, lng };
-            document.getElementById('coord-indicator').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-            e.target.textContent = "Konum İşaretlendi!";
-            e.target.classList.remove('btn-secondary');
-            e.target.classList.add('btn-outline');
-            showToast("Harita üzerinde konum seçildi.", "info");
-        });
-    });
+    // Initialize interactive form map
+    initFormMap(13);
     
     // Submit Add Portfolio Form
     document.getElementById('form-portfolio-add').addEventListener('submit', async (e) => {
@@ -1363,10 +1396,10 @@ async function openEditPortfolioModal(p) {
             </div>
             
             <div class="form-group">
-                <label>Haritada Konumu Düzenle</label>
-                <div style="display:flex; gap:12px; align-items:center; margin-bottom:8px;">
-                    <button type="button" id="btn-edit-location" class="btn btn-outline" style="font-size:12px; padding:8px 12px;">Haritadan Konum Seç</button>
-                    <span id="coord-edit-indicator" style="font-size:11px; color:var(--text-secondary);">${tempCoordinates.lat.toFixed(5)}, ${tempCoordinates.lng.toFixed(5)}</span>
+                <label>Mülk Konumu (Haritada İşaretleyin)</label>
+                <div id="form-map-container" style="width: 100%; height: 250px; border-radius: var(--border-radius-md); border: 1px solid var(--border-color); margin-bottom: 8px; position: relative; overflow: hidden; background: #111;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span id="coord-indicator" style="font-size:11px; color:var(--text-secondary);">Enlem/Boylam seçilmedi</span>
                 </div>
             </div>
             
@@ -1430,27 +1463,10 @@ async function openEditPortfolioModal(p) {
         });
     }
     
-    // Position select pin initially on edit map
-    setTimeout(() => {
-        if (p.latitude && p.longitude) {
-            setSelectMarkerPosition(p.latitude, p.longitude);
-        }
-    }, 100);
+    // Initialize interactive form map with current portfolio coordinates
+    initFormMap(15);
     
-    // Location Picker edit mode
-    document.getElementById('btn-edit-location').addEventListener('click', (e) => {
-        e.target.textContent = "Haritaya Tıklayarak İşaretleyin...";
-        e.target.classList.add('btn-secondary');
-        
-        enableLocationSelection((lat, lng) => {
-            tempCoordinates = { lat, lng };
-            document.getElementById('coord-edit-indicator').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-            e.target.textContent = "Konum Güncellendi!";
-            e.target.classList.remove('btn-secondary');
-            e.target.classList.add('btn-outline');
-            showToast("Harita konumu güncellendi.", "info");
-        });
-    });
+
     
     // Submit Edit Form
     document.getElementById('form-portfolio-edit').addEventListener('submit', async (e) => {
@@ -1549,6 +1565,7 @@ function initLocationChainedSelects(prefix, selectedCity = '', selectedDistrict 
             neighborhoodSelect.disabled = true;
         } else {
             populateDistricts(city);
+            triggerFormMapGeocode(city, '', '');
         }
     });
 
@@ -1561,6 +1578,17 @@ function initLocationChainedSelects(prefix, selectedCity = '', selectedDistrict 
             neighborhoodSelect.disabled = true;
         } else {
             populateNeighborhoods(city, district);
+            triggerFormMapGeocode(city, district, '');
+        }
+    });
+
+    // Neighborhood Change Event
+    neighborhoodSelect.addEventListener('change', () => {
+        const city = citySelect.value;
+        const district = districtSelect.value;
+        const neighborhood = neighborhoodSelect.value;
+        if (neighborhood) {
+            triggerFormMapGeocode(city, district, neighborhood);
         }
     });
 
@@ -1745,4 +1773,139 @@ function setupOwnerAutocompleteAndQuickAdd(prefix) {
             }
         });
     });
+}
+
+function initFormMap(zoom = 13) {
+    if (formMapInstance) {
+        formMapInstance.remove();
+        formMapInstance = null;
+        formMarker = null;
+    }
+    
+    setTimeout(() => {
+        const formMapEl = document.getElementById('form-map-container');
+        if (formMapEl) {
+            formMapInstance = L.map('form-map-container').setView([tempCoordinates.lat, tempCoordinates.lng], zoom);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                maxZoom: 20
+            }).addTo(formMapInstance);
+            
+            formMapInstance.on('click', (e) => {
+                const { lat, lng } = e.latlng;
+                tempCoordinates = { lat, lng };
+                const indicator = document.getElementById('coord-indicator');
+                if (indicator) indicator.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                
+                if (formMarker) {
+                    formMarker.setLatLng(e.latlng);
+                } else {
+                    const redIcon = L.divIcon({
+                        html: `
+                            <div style="
+                                background-color: #ef4444;
+                                width: 14px;
+                                height: 14px;
+                                border-radius: 50%;
+                                border: 2px solid #ffffff;
+                                box-shadow: 0 0 10px #ef4444;
+                                transform: translate(-3px, -3px);
+                            "></div>
+                        `,
+                        className: 'form-red-marker',
+                        iconSize: [14, 14],
+                        iconAnchor: [7, 7]
+                    });
+                    formMarker = L.marker(e.latlng, { icon: redIcon }).addTo(formMapInstance);
+                }
+            });
+            
+            const indicator = document.getElementById('coord-indicator');
+            if (indicator) indicator.textContent = `${tempCoordinates.lat.toFixed(5)}, ${tempCoordinates.lng.toFixed(5)}`;
+            
+            const redIcon = L.divIcon({
+                html: `
+                    <div style="
+                        background-color: #ef4444;
+                        width: 14px;
+                        height: 14px;
+                        border-radius: 50%;
+                        border: 2px solid #ffffff;
+                        box-shadow: 0 0 10px #ef4444;
+                        transform: translate(-3px, -3px);
+                    "></div>
+                `,
+                className: 'form-red-marker',
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+            formMarker = L.marker([tempCoordinates.lat, tempCoordinates.lng], { icon: redIcon }).addTo(formMapInstance);
+        }
+    }, 200);
+}
+
+async function triggerFormMapGeocode(city, district, neighborhood) {
+    if (!formMapInstance) return;
+    
+    let query = '';
+    let zoomLevel = 10;
+    
+    if (neighborhood) {
+        query = `${neighborhood}, ${district}, ${city}, Türkiye`;
+        zoomLevel = 16;
+    } else if (district) {
+        query = `${district}, ${city}, Türkiye`;
+        zoomLevel = 13;
+    } else if (city) {
+        query = `${city}, Türkiye`;
+        zoomLevel = 10;
+    } else {
+        return;
+    }
+    
+    try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        const res = await fetch(url, {
+            headers: {
+                'User-Agent': 'ProjectCRM/1.0 (musasarier@example.com)'
+            }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lng = parseFloat(data[0].lon);
+                
+                tempCoordinates = { lat, lng };
+                const indicator = document.getElementById('coord-indicator');
+                if (indicator) indicator.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                
+                formMapInstance.flyTo([lat, lng], zoomLevel, { animate: true });
+                
+                if (formMarker) {
+                    formMarker.setLatLng([lat, lng]);
+                } else {
+                    const redIcon = L.divIcon({
+                        html: `
+                            <div style="
+                                background-color: #ef4444;
+                                width: 14px;
+                                height: 14px;
+                                border-radius: 50%;
+                                border: 2px solid #ffffff;
+                                box-shadow: 0 0 10px #ef4444;
+                                transform: translate(-3px, -3px);
+                            "></div>
+                        `,
+                        className: 'form-red-marker',
+                        iconSize: [14, 14],
+                        iconAnchor: [7, 7]
+                    });
+                    formMarker = L.marker([lat, lng], { icon: redIcon }).addTo(formMapInstance);
+                }
+            }
+        }
+    } catch (err) {
+        console.error("Form map geocoding failed:", err);
+    }
 }
