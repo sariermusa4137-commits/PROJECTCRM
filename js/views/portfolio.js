@@ -3,6 +3,7 @@
 import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, canViewPhone, maskPhoneNumber, apiFetch, canDelete, canEditRecord } from '../store.js';
 import { initMap, renderPortfolioMarkers, enableLocationSelection, setSelectMarkerPosition } from '../components/map.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
+import { LOCATIONS_DATA } from '../locations_data.js';
 
 function getAgeSelectValue(age) {
     if (typeof age === 'string') {
@@ -238,7 +239,7 @@ function updatePortfolioList() {
                         </div>
                         <div class="portfolio-location">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-md" style="color:var(--primary);"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
-                            <span>${p.district}, ${p.neighborhood}</span>
+                            <span>${p.city ? p.city + ' / ' : ''}${p.district} / ${p.neighborhood}</span>
                         </div>
                     </div>
                     <div class="portfolio-bottom">
@@ -367,7 +368,7 @@ function openPortfolioDetailModal(p) {
                         </div>
                         <div class="spec-entry">
                             <span class="spec-entry-label">Konum</span>
-                            <span class="spec-entry-value">${p.district}, ${p.neighborhood}</span>
+                            <span class="spec-entry-value">${p.city ? p.city + ' / ' : ''}${p.district} / ${p.neighborhood}</span>
                         </div>
                         <div class="spec-entry">
                             <span class="spec-entry-label">Bina Yaşı</span>
@@ -904,15 +905,21 @@ function openAddPortfolioModal() {
             <div class="form-group-three">
                 <div class="form-group">
                     <label for="p-city">Şehir</label>
-                    <input type="text" id="p-city" value="İstanbul" required>
+                    <select id="p-city" required>
+                        <option value="">Şehir Seçin</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="p-district">İlçe</label>
-                    <input type="text" id="p-district" placeholder="Örn: Kadıköy" required>
+                    <select id="p-district" required disabled>
+                        <option value="">İlçe Seçin</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="p-neighborhood">Mahalle</label>
-                    <input type="text" id="p-neighborhood" placeholder="Örn: Göztepe" required>
+                    <select id="p-neighborhood" required disabled>
+                        <option value="">Mahalle Seçin</option>
+                    </select>
                 </div>
             </div>
             
@@ -1036,6 +1043,9 @@ function openAddPortfolioModal() {
     `;
     
     openModal("Yeni İlan Girişi", content);
+    
+    // Setup Chained Selects for Location
+    initLocationChainedSelects('p');
     
     // Setup Autocomplete and Quick Add Owner
     setupOwnerAutocompleteAndQuickAdd('p');
@@ -1219,15 +1229,21 @@ function openEditPortfolioModal(p) {
             <div class="form-group-three">
                 <div class="form-group">
                     <label for="pe-city">Şehir</label>
-                    <input type="text" id="pe-city" value="${p.city || 'İstanbul'}" required>
+                    <select id="pe-city" required>
+                        <option value="">Şehir Seçin</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="pe-district">İlçe</label>
-                    <input type="text" id="pe-district" value="${p.district}" required>
+                    <select id="pe-district" required disabled>
+                        <option value="">İlçe Seçin</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="pe-neighborhood">Mahalle</label>
-                    <input type="text" id="pe-neighborhood" value="${p.neighborhood}" required>
+                    <select id="pe-neighborhood" required disabled>
+                        <option value="">Mahalle Seçin</option>
+                    </select>
                 </div>
             </div>
             
@@ -1349,6 +1365,9 @@ function openEditPortfolioModal(p) {
     
     openModal("İlan Düzenleme", content);
     
+    // Setup Chained Selects for Location
+    initLocationChainedSelects('pe', p.city || 'İstanbul', p.district, p.neighborhood);
+    
     // Setup Autocomplete and Quick Add Owner
     setupOwnerAutocompleteAndQuickAdd('pe');
     
@@ -1461,6 +1480,75 @@ function openEditPortfolioModal(p) {
     });
 }
 
+function initLocationChainedSelects(prefix, selectedCity = '', selectedDistrict = '', selectedNeighborhood = '') {
+    const citySelect = document.getElementById(`${prefix}-city`);
+    const districtSelect = document.getElementById(`${prefix}-district`);
+    const neighborhoodSelect = document.getElementById(`${prefix}-neighborhood`);
+
+    if (!citySelect || !districtSelect || !neighborhoodSelect) return;
+
+    // 1. Populate Cities
+    citySelect.innerHTML = '<option value="">Şehir Seçin</option>' + 
+        Object.keys(LOCATIONS_DATA).map(city => `<option value="${city}">${city}</option>`).join('');
+
+    // Set initial city
+    if (selectedCity) {
+        citySelect.value = selectedCity;
+        populateDistricts(selectedCity, selectedDistrict, selectedNeighborhood);
+    }
+
+    // City Change Event
+    citySelect.addEventListener('change', () => {
+        const city = citySelect.value;
+        if (!city) {
+            districtSelect.innerHTML = '<option value="">İlçe Seçin</option>';
+            districtSelect.disabled = true;
+            neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>';
+            neighborhoodSelect.disabled = true;
+        } else {
+            populateDistricts(city);
+        }
+    });
+
+    // District Change Event
+    districtSelect.addEventListener('change', () => {
+        const city = citySelect.value;
+        const district = districtSelect.value;
+        if (!district) {
+            neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>';
+            neighborhoodSelect.disabled = true;
+        } else {
+            populateNeighborhoods(city, district);
+        }
+    });
+
+    function populateDistricts(city, initDistrict = '', initNeighborhood = '') {
+        const districts = LOCATIONS_DATA[city] ? Object.keys(LOCATIONS_DATA[city]) : [];
+        districtSelect.innerHTML = '<option value="">İlçe Seçin</option>' +
+            districts.map(d => `<option value="${d}">${d}</option>`).join('');
+        districtSelect.disabled = false;
+        
+        neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>';
+        neighborhoodSelect.disabled = true;
+
+        if (initDistrict) {
+            districtSelect.value = initDistrict;
+            populateNeighborhoods(city, initDistrict, initNeighborhood);
+        }
+    }
+
+    function populateNeighborhoods(city, district, initNeighborhood = '') {
+        const neighborhoods = (LOCATIONS_DATA[city] && LOCATIONS_DATA[city][district]) ? LOCATIONS_DATA[city][district] : [];
+        neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>' +
+            neighborhoods.map(n => `<option value="${n}">${n}</option>`).join('');
+        neighborhoodSelect.disabled = false;
+
+        if (initNeighborhood) {
+            neighborhoodSelect.value = initNeighborhood;
+        }
+    }
+}
+
 function setupOwnerAutocompleteAndQuickAdd(prefix) {
     const ownerSearch = document.getElementById(`${prefix}-owner-search`);
     const ownerIdInput = document.getElementById(`${prefix}-owner-id`);
@@ -1472,6 +1560,7 @@ function setupOwnerAutocompleteAndQuickAdd(prefix) {
     ownerSearch.addEventListener('input', () => {
         const val = ownerSearch.value.trim().toLowerCase();
         if (!val) {
+            autocompleteResults.innerHTML = '';
             autocompleteResults.classList.add('hidden');
             return;
         }
@@ -1497,8 +1586,17 @@ function setupOwnerAutocompleteAndQuickAdd(prefix) {
         autocompleteResults.classList.remove('hidden');
     });
 
+    // Add Blur Listener to hide dropdown when losing focus
+    ownerSearch.addEventListener('blur', () => {
+        setTimeout(() => {
+            autocompleteResults.innerHTML = '';
+            autocompleteResults.classList.add('hidden');
+        }, 200);
+    });
+
     const clickOutsideHandler = (ev) => {
         if (!ownerSearch.contains(ev.target) && !autocompleteResults.contains(ev.target)) {
+            autocompleteResults.innerHTML = '';
             autocompleteResults.classList.add('hidden');
         }
     };
@@ -1509,6 +1607,7 @@ function setupOwnerAutocompleteAndQuickAdd(prefix) {
         if (item) {
             ownerSearch.value = item.dataset.name;
             ownerIdInput.value = item.dataset.id;
+            autocompleteResults.innerHTML = '';
             autocompleteResults.classList.add('hidden');
         }
     });
