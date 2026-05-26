@@ -10,7 +10,7 @@ import datetime
 from flask import Blueprint, request, session, jsonify, current_app
 from werkzeug.utils import secure_filename
 from db import db_connection
-from auth_middleware import login_required
+from auth_middleware import login_required, get_user_role_and_permissions, check_delete_permission, check_update_permission
 import google.generativeai as genai
 
 data_bp = Blueprint('data', __name__)
@@ -62,13 +62,8 @@ def get_all_data():
             current_user_id = session.get('user_id')
 
             # Kullanıcı rolü ve izinlerini al
-            cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
-            user_row = cursor.fetchone()
-            role = (user_row['role'] if user_row else None) or 'agent'
-
-            cursor.execute('SELECT can_view_all_agency FROM rol_yetkileri WHERE role = ?', (role,))
-            perm_row = cursor.fetchone()
-            can_view_all = perm_row['can_view_all_agency'] if perm_row else 1
+            role, permissions = get_user_role_and_permissions(cursor, current_user_id)
+            can_view_all = permissions.get('can_view_all_agency', 1)
 
             response_data = {}
             for table in ALLOWED_COLLECTIONS:
@@ -90,6 +85,15 @@ def get_all_data():
                 # Doğum günü etkinliklerini meetings'e ekle
                 if table == 'meetings':
                     list_data = _inject_birthday_events(cursor, agency_id, current_user_id, can_view_all, list_data)
+
+                # --- RBAC: Danışman (agent) maskeleme ---
+                # Agent rolü ve can_update_own_only aktifse, başkalarının portföylerinde
+                # hassas verileri (owner_id, notes) maskele
+                if table == 'portfolios' and role == 'agent' and permissions.get('can_update_own_only', 0):
+                    for item in list_data:
+                        if item.get('createdById') != current_user_id:
+                            item['owner_id'] = None
+                            item['notes'] = '*** YETKİNİZ YOK ***'
 
                 response_data[table] = list_data
 
@@ -229,15 +233,10 @@ def update_data_record(collection, id):
             cursor = conn.cursor()
             current_user_id = session.get('user_id')
 
-            # Müşteri düzenleme izni kontrolü
-            if collection == 'customers':
-                cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
-                user_row = cursor.fetchone()
-                role = (user_row['role'] if user_row else None) or 'agent'
-                cursor.execute('SELECT can_edit_customer FROM rol_yetkileri WHERE role = ?', (role,))
-                perm_row = cursor.fetchone()
-                if perm_row and not perm_row['can_edit_customer']:
-                    return {"error": "Müşteri düzenleme yetkiniz bulunmamaktadır."}, 403
+            # RBAC: Güncelleme izni kontrolü
+            allowed, error_msg = check_update_permission(cursor, current_user_id, collection, id)
+            if not allowed:
+                return {"error": error_msg}, 403
 
             cursor.execute(f'PRAGMA table_info({collection})')
             columns = [col[1] for col in cursor.fetchall()]
@@ -281,15 +280,10 @@ def delete_data_record(collection, id):
             cursor = conn.cursor()
             current_user_id = session.get('user_id')
 
-            # Portföy silme izni kontrolü
-            if collection == 'portfolios':
-                cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
-                user_row = cursor.fetchone()
-                role = (user_row['role'] if user_row else None) or 'agent'
-                cursor.execute('SELECT can_delete_portfolio FROM rol_yetkileri WHERE role = ?', (role,))
-                perm_row = cursor.fetchone()
-                if perm_row and not perm_row['can_delete_portfolio']:
-                    return {"error": "Portföy silme yetkiniz bulunmamaktadır."}, 403
+            # RBAC: Silme izni kontrolü (tüm koleksiyonlar)
+            allowed, error_msg = check_delete_permission(cursor, current_user_id, collection)
+            if not allowed:
+                return {"error": error_msg}, 403
 
             cursor.execute(f"DELETE FROM {collection} WHERE id = ?", (id,))
             conn.commit()

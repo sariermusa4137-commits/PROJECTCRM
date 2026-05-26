@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Görüşmeler, Takvim ve Kanban Süreç Panosu Görünümü
 
-import { state, addRecord, updateRecord, deleteRecord, apiFetch } from '../store.js';
+import { state, addRecord, updateRecord, deleteRecord, apiFetch, canDelete } from '../store.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
 let currentYear = new Date().getFullYear();
@@ -390,7 +390,7 @@ function openMeetingDetailModal(m) {
             ${isBirthday ? '' : `
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
                 <button id="btn-edit-m" class="btn btn-outline">Düzenle</button>
-                <button id="btn-delete-m" class="btn btn-danger">Randevuyu İptal Et</button>
+                ${canDelete() ? '<button id="btn-delete-m" class="btn btn-danger">Randevuyu İptal Et</button>' : ''}
             </div>
             `}
         </div>
@@ -406,19 +406,22 @@ function openMeetingDetailModal(m) {
         });
         
         // Delete/Cancel click
-        document.getElementById('btn-delete-m').addEventListener('click', async () => {
-            if (confirm("Bu randevu/aktivite kaydını silmek istediğinize emin misiniz?")) {
-                try {
-                    await deleteRecord('meetings', m.id);
-                    closeModal();
-                    showToast("Aktivite silindi.", "success");
-                    renderKanbanBoard();
-                    renderCalendar();
-                } catch (err) {
-                    showToast("Aktivite silinirken hata: " + err.message, "error");
+        const btnDeleteM = document.getElementById('btn-delete-m');
+        if (btnDeleteM) {
+            btnDeleteM.addEventListener('click', async () => {
+                if (confirm("Bu randevu/aktivite kaydını silmek istediğinize emin misiniz?")) {
+                    try {
+                        await deleteRecord('meetings', m.id);
+                        closeModal();
+                        showToast("Aktivite silindi.", "success");
+                        renderKanbanBoard();
+                        renderCalendar();
+                    } catch (err) {
+                        showToast("Aktivite silinirken hata: " + err.message, "error");
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 }
 

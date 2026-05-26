@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Müşteri Yönetimi, Zaman Tüneli ve Eşleştirme Görünümü
 
-import { state, addRecord, updateRecord, deleteRecord, getMatchesForCustomer, canViewPhone, maskPhoneNumber, apiFetch } from '../store.js';
+import { state, addRecord, updateRecord, deleteRecord, getMatchesForCustomer, canViewPhone, maskPhoneNumber, apiFetch, canDelete, canEditRecord } from '../store.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
 let activeTab = 'all'; // all, buyer, seller
@@ -596,8 +596,8 @@ function openCustomerDetailModal(c) {
                 ` : ''}
                 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:24px; border-top:1px solid var(--border-color); padding-top:16px;">
-                    <button id="btn-edit-c" class="btn btn-outline">Profili Düzenle</button>
-                    <button id="btn-delete-c" class="btn btn-danger">Müşteriyi Sil</button>
+                    <button id="btn-edit-c" class="btn btn-outline" ${canEditRecord(c) ? '' : 'disabled style="opacity:0.5; cursor:not-allowed;"'}>Profili Düzenle</button>
+                    ${canDelete() ? '<button id="btn-delete-c" class="btn btn-danger">Müşteriyi Sil</button>' : ''}
                 </div>
             </div>
             
@@ -736,18 +736,21 @@ function openCustomerDetailModal(c) {
     });
     
     // Delete Customer
-    document.getElementById('btn-delete-c').addEventListener('click', async () => {
-        if (confirm("Bu müşteriyi silmek istediğinize emin misiniz? Tüm geçmiş görüşmeler de etkilenecektir.")) {
-            try {
-                await deleteRecord('customers', c.id);
-                closeModal();
-                showToast("Müşteri başarıyla silindi.", "success");
-                updateCustomerTable();
-            } catch (err) {
-                showToast("Müşteri silinirken hata: " + err.message, "error");
+    const btnDeleteC = document.getElementById('btn-delete-c');
+    if (btnDeleteC) {
+        btnDeleteC.addEventListener('click', async () => {
+            if (confirm("Bu müşteriyi silmek istediğinize emin misiniz? Tüm geçmiş görüşmeler de etkilenecektir.")) {
+                try {
+                    await deleteRecord('customers', c.id);
+                    closeModal();
+                    showToast("Müşteri başarıyla silindi.", "success");
+                    updateCustomerTable();
+                } catch (err) {
+                    showToast("Müşteri silinirken hata: " + err.message, "error");
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 function formatDOB(dateString) {

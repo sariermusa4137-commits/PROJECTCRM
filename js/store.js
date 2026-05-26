@@ -516,6 +516,23 @@ export function maskPhoneNumber(phone) {
     return cleanPhone.substring(0, 7) + " *** ** **";
 }
 
+export function canDelete() {
+    if (!state.currentUser) return false;
+    return (state.currentUser.role || 'agent').toLowerCase() === 'admin';
+}
+
+export function canEditRecord(record) {
+    if (!state.currentUser) return false;
+    const role = (state.currentUser.role || 'agent').toLowerCase();
+    if (role === 'admin' || role === 'assistant') return true;
+    return record && record.createdById === state.currentUser.uid;
+}
+
+export function isAdmin() {
+    if (!state.currentUser) return false;
+    return (state.currentUser.role || 'agent').toLowerCase() === 'admin';
+}
+
 // ----------------- TIMELINE AUTOMATIC LOGGING -----------------
 
 export async function logDealEventToTimelines(deal, eventTitle, eventNotes, eventType = "Süreç") {

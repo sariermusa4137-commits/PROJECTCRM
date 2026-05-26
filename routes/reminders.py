@@ -143,15 +143,15 @@ def delete_reminder(id):
                 
             role = user_row['role'] or 'agent'
             agency_id = user_row['agencyId']
-            
-            if role == 'admin':
-                cursor.execute('SELECT * FROM reminders WHERE id = ? AND agencyId = ?', (id, agency_id))
-            else:
-                cursor.execute('SELECT * FROM reminders WHERE id = ? AND agencyId = ? AND createdById = ?', (id, agency_id, current_user_id))
-                
+
+            # RBAC: Sadece admin silebilir
+            if role != 'admin':
+                return {"error": "Anımsatıcı silme yetkiniz bulunmamaktadır."}, 403
+
+            cursor.execute('SELECT * FROM reminders WHERE id = ? AND agencyId = ?', (id, agency_id))
             reminder = cursor.fetchone()
             if not reminder:
-                return {"error": "Anımsatıcı bulunamadı veya yetkiniz yok."}, 404
+                return {"error": "Anımsatıcı bulunamadı."}, 404
                 
             cursor.execute("DELETE FROM reminders WHERE id = ?", (id,))
             conn.commit()

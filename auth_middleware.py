@@ -191,3 +191,79 @@ def roles_required(*requirements):
             return f(*args, **kwargs)
         return decorated_function
     return decorator
+
+
+def get_user_role_and_permissions(cursor, user_id):
+    """
+    Kullanıcının rolünü ve tüm izinlerini döndürür.
+    Returns: (role: str, permissions: dict)
+    """
+    cursor.execute('SELECT role FROM users WHERE uid = ?', (user_id,))
+    user_row = cursor.fetchone()
+    role = (user_row['role'] if user_row else None) or 'agent'
+
+    cursor.execute('SELECT * FROM rol_yetkileri WHERE role = ?', (role,))
+    perm_row = cursor.fetchone()
+    permissions = dict(perm_row) if perm_row else {}
+
+    return role, permissions
+
+
+def check_delete_permission(cursor, user_id, collection):
+    """
+    Koleksiyon bazında silme izni kontrolü.
+    Returns: (allowed: bool, error_message: str or None)
+    """
+    role, permissions = get_user_role_and_permissions(cursor, user_id)
+
+    # Admin her zaman silebilir
+    if role == 'admin':
+        return True, None
+
+    # Koleksiyona göre izin kontrolü
+    perm_map = {
+        'portfolios': 'can_delete_portfolio',
+        'customers': 'can_delete_customer',
+        'meetings': 'can_delete_meeting',
+        'deals': 'can_delete_deal',
+    }
+
+    perm_key = perm_map.get(collection)
+    if perm_key and not permissions.get(perm_key, 0):
+        return False, f"{collection} silme yetkiniz bulunmamaktadır."
+
+    # Diğer koleksiyonlar (todos, activities) için admin-only
+    if collection in ('todos', 'activities') and role != 'admin':
+        return False, "Bu işlem için yetkiniz bulunmamaktadır."
+
+    return True, None
+
+
+def check_update_permission(cursor, user_id, collection, record_id):
+    """
+    Koleksiyon bazında güncelleme izni kontrolü.
+    can_update_own_only=1 ise sadece kendi kaydını güncelleyebilir.
+    Returns: (allowed: bool, error_message: str or None)
+    """
+    role, permissions = get_user_role_and_permissions(cursor, user_id)
+
+    # Admin her zaman güncelleyebilir
+    if role == 'admin':
+        return True, None
+
+    # Koleksiyona göre düzenleme izni kontrolü
+    if collection == 'customers' and not permissions.get('can_edit_customer', 1):
+        return False, "Müşteri düzenleme yetkiniz bulunmamaktadır."
+    if collection == 'portfolios' and not permissions.get('can_edit_portfolio', 1):
+        return False, "Portföy düzenleme yetkiniz bulunmamaktadır."
+
+    # can_update_own_only kontrolü (Danışman rolü)
+    if permissions.get('can_update_own_only', 0):
+        if collection in ('portfolios', 'customers', 'meetings', 'deals'):
+            cursor.execute(f'SELECT createdById FROM {collection} WHERE id = ?', (record_id,))
+            record = cursor.fetchone()
+            if record and record['createdById'] != user_id:
+                return False, "Sadece kendi oluşturduğunuz kayıtları düzenleyebilirsiniz."
+
+    return True, None
+

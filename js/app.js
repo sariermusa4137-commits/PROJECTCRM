@@ -1,6 +1,6 @@
 // PROJECTCRM - SPA Router and Application Orchestrator
 
-import { state, initStore, subscribe, logout } from './store.js';
+import { state, initStore, subscribe, logout, isAdmin } from './store.js';
 import { renderAuthView } from './views/auth.js';
 import { renderDashboardView } from './views/dashboard.js';
 import { renderPortfolioView } from './views/portfolio.js';
@@ -143,6 +143,13 @@ function handleRouting() {
         window.location.hash = "#dashboard";
     }
 
+    // Role-based route guard: Admin-only views
+    const adminOnlyViews = ['users', 'reports'];
+    if (isAuthenticated && adminOnlyViews.includes(hash.replace('#', '')) && !isAdmin()) {
+        hash = '#forbidden';
+        window.location.hash = '#forbidden';
+    }
+
     const viewName = hash.replace("#", "");
     currentView = viewName;
 
@@ -278,6 +285,20 @@ function handleStateChange() {
         if (agencyNameBadge) agencyNameBadge.textContent = state.agency ? state.agency.name : "Acente Yok";
         if (txtAgencyCode) txtAgencyCode.textContent = state.agency ? `Kod: ${state.agency.id}` : "Kod: -";
     }
+
+    // Role-based sidebar menu filtering
+    const roleFilteredLinks = document.querySelectorAll('.nav-link[data-role]');
+    roleFilteredLinks.forEach(link => {
+        const requiredRole = link.getAttribute('data-role');
+        const li = link.closest('li');
+        if (li) {
+            if (requiredRole === 'admin' && !isAdmin()) {
+                li.style.display = 'none';
+            } else {
+                li.style.display = '';
+            }
+        }
+    });
 
     // Toggle Demo Mode text in topbar
     if (demoModeIndicator) {

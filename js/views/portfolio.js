@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Portföy Yönetimi ve Harita Görünümü
 
-import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, canViewPhone, maskPhoneNumber, apiFetch } from '../store.js';
+import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, canViewPhone, maskPhoneNumber, apiFetch, canDelete, canEditRecord } from '../store.js';
 import { initMap, renderPortfolioMarkers, enableLocationSelection, setSelectMarkerPosition } from '../components/map.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
@@ -288,7 +288,10 @@ function openPortfolioDetailModal(p) {
     const matchingBuyers = getMatchesForPortfolio(p);
     
     const owner = state.customers.find(c => c.id === p.owner_id);
-    const ownerName = owner ? owner.name : "-";
+    const userRole = (state.currentUser?.role || 'agent').toLowerCase();
+    const isOwnRecord = p.createdById === state.currentUser?.uid;
+    const ownerMasked = (userRole === 'agent' && !isOwnRecord);
+    const ownerName = ownerMasked ? '*** YETKİNİZ YOK ***' : (owner ? owner.name : "-");
     
     const content = `
         <div class="tabs" style="margin-bottom: 20px;">
@@ -302,7 +305,7 @@ function openPortfolioDetailModal(p) {
                     <img src="${p.imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=500&auto=format&fit=crop&q=60'}" class="detail-img" alt="Mülk Resmi">
                     <div style="margin-top:16px;">
                         <h4 style="margin-bottom:8px;">Danışman Notları</h4>
-                        <p style="font-size:13px; color:var(--text-secondary); line-height:1.6; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:var(--border-radius-md); white-space: pre-wrap; word-wrap: break-word;">${p.notes || "Not eklenmemiş."}</p>
+                        <p style="font-size:13px; color:var(--text-secondary); line-height:1.6; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:var(--border-radius-md); white-space: pre-wrap; word-wrap: break-word;">${ownerMasked ? '*** YETKİNİZ YOK ***' : (p.notes || "Not eklenmemiş.")}</p>
                     </div>
                     
                     <!-- Matching Buyers Section -->
@@ -396,7 +399,21 @@ function openPortfolioDetailModal(p) {
                         </div>
                         <div class="spec-entry">
                             <span class="spec-entry-label">Mülk Sahibi</span>
-                            <span class="spec-entry-value">${owner ? `<span class="client-type-badge satici" style="cursor:pointer; margin-top:2px;" id="view-portfolio-owner-btn" data-id="${owner.id}">${ownerName}</span>` : "-"}</span>
+                            <span class="spec-entry-value">
+                                ${ownerMasked 
+                                    ? `<span class="client-type-badge satici" style="cursor:not-allowed; opacity:0.6; margin-top:2px;">*** YETKİNİZ YOK ***</span>` 
+                                    : (owner ? `<span class="client-type-badge satici" style="cursor:pointer; margin-top:2px;" id="view-portfolio-owner-btn" data-id="${owner.id}">${ownerName}</span>` : "-")
+                                }
+                            </span>
+                        </div>
+                        <div class="spec-entry">
+                            <span class="spec-entry-label">Mülk Sahibi Tel</span>
+                            <span class="spec-entry-value">
+                                ${ownerMasked 
+                                    ? '*** YETKİNİZ YOK ***' 
+                                    : (owner ? (canViewPhone(owner) ? owner.phone : maskPhoneNumber(owner.phone)) : "-")
+                                }
+                            </span>
                         </div>
                         <div class="spec-entry" style="grid-column: span 2;">
                             <span class="spec-entry-label">Tapu Durumu Notları</span>
@@ -419,8 +436,8 @@ function openPortfolioDetailModal(p) {
                             ✨ Sosyal Medya İlan Metni Üret
                         </button>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                            <button id="btn-edit-p" class="btn btn-outline">Düzenle</button>
-                            <button id="btn-delete-p" class="btn btn-danger">İlanı Sil</button>
+                            <button id="btn-edit-p" class="btn btn-outline" ${canEditRecord(p) ? '' : 'disabled style="opacity:0.5; cursor:not-allowed;"'}>Düzenle</button>
+                            ${canDelete() ? '<button id="btn-delete-p" class="btn btn-danger">İlanı Sil</button>' : ''}
                         </div>
                     </div>
                 </div>
@@ -482,18 +499,20 @@ function openPortfolioDetailModal(p) {
     });
     
     // 3. Delete Listing
-    document.getElementById('btn-delete-p').addEventListener('click', async () => {
-        if (confirm("Bu ilanı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
-            try {
-                await deleteRecord('portfolios', p.id);
-                closeModal();
-                showToast("İlan başarıyla silindi.", "success");
-                updatePortfolioList();
-            } catch (err) {
-                showToast("Silme hatası: " + err.message, "error");
+    if (document.getElementById('btn-delete-p')) {
+        document.getElementById('btn-delete-p').addEventListener('click', async () => {
+            if (confirm("Bu ilanı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
+                try {
+                    await deleteRecord('portfolios', p.id);
+                    closeModal();
+                    showToast("İlan başarıyla silindi.", "success");
+                    updatePortfolioList();
+                } catch (err) {
+                    showToast("Silme hatası: " + err.message, "error");
+                }
             }
-        }
-    });
+        });
+    }
     
     // Share Matching info via WhatsApp
     const shareBtns = document.querySelectorAll('.match-item .btn-congratulate');
@@ -525,13 +544,15 @@ async function loadFinancialAnalysis(p) {
                 <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5;">
                     Bu mülk için aylık kira getiri verisi tanımlanmamış. ROI analizi ve 5 yıllık alternatif yatırım projeksiyonlarını görmek için lütfen ilan detaylarını düzenleyin.
                 </p>
-                <button id="btn-edit-p-financial" class="btn btn-primary" style="margin: 0 auto; display: block; padding: 8px 24px;">Mülkü Düzenle</button>
+                <button id="btn-edit-p-financial" class="btn btn-primary" style="margin: 0 auto; display: block; padding: 8px 24px;" ${canEditRecord(p) ? '' : 'disabled style="opacity:0.5; cursor:not-allowed;"'}>Mülkü Düzenle</button>
             </div>
         `;
-        document.getElementById('btn-edit-p-financial').addEventListener('click', () => {
-            closeModal();
-            openEditPortfolioModal(p);
-        });
+        if (canEditRecord(p)) {
+            document.getElementById('btn-edit-p-financial').addEventListener('click', () => {
+                closeModal();
+                openEditPortfolioModal(p);
+            });
+        }
         return;
     }
     

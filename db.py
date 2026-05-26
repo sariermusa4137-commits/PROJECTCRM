@@ -360,29 +360,52 @@ def _init_rol_yetkileri(cursor, conn):
             CREATE TABLE IF NOT EXISTS rol_yetkileri (
                 role TEXT PRIMARY KEY,
                 can_delete_portfolio INTEGER DEFAULT 1,
+                can_delete_customer INTEGER DEFAULT 1,
+                can_delete_meeting INTEGER DEFAULT 1,
+                can_delete_deal INTEGER DEFAULT 1,
+                can_edit_portfolio INTEGER DEFAULT 1,
                 can_edit_customer INTEGER DEFAULT 1,
                 can_view_all_agency INTEGER DEFAULT 1,
-                can_view_reports INTEGER DEFAULT 1
+                can_view_reports INTEGER DEFAULT 1,
+                can_update_own_only INTEGER DEFAULT 0
             )
         ''')
         # Yeni kolonlar için güvenli migration
-        for t, col, c_type in [("rol_yetkileri", "can_view_reports", "INTEGER DEFAULT 1")]:
+        new_perm_cols = [
+            ("rol_yetkileri", "can_view_reports", "INTEGER DEFAULT 1"),
+            ("rol_yetkileri", "can_delete_customer", "INTEGER DEFAULT 1"),
+            ("rol_yetkileri", "can_delete_meeting", "INTEGER DEFAULT 1"),
+            ("rol_yetkileri", "can_delete_deal", "INTEGER DEFAULT 1"),
+            ("rol_yetkileri", "can_edit_portfolio", "INTEGER DEFAULT 1"),
+            ("rol_yetkileri", "can_update_own_only", "INTEGER DEFAULT 0"),
+        ]
+        for t, col, c_type in new_perm_cols:
             try:
                 cursor.execute(f"ALTER TABLE {t} ADD COLUMN {col} {c_type}")
             except sqlite3.OperationalError:
                 pass
 
+        # Sütunlar: can_delete_portfolio, can_delete_customer, can_delete_meeting, can_delete_deal,
+        #           can_edit_portfolio, can_edit_customer, can_view_all_agency, can_view_reports, can_update_own_only
         defaults = {
-            'admin':     (1, 1, 1, 1),
-            'agent':     (1, 1, 1, 0),
-            'assistant': (0, 1, 1, 0),
+            'admin':     (1, 1, 1, 1, 1, 1, 1, 1, 0),
+            'agent':     (0, 0, 0, 0, 1, 1, 1, 0, 1),
+            'assistant': (0, 0, 0, 0, 1, 1, 1, 0, 0),
         }
+        insert_cols = 'role, can_delete_portfolio, can_delete_customer, can_delete_meeting, can_delete_deal, can_edit_portfolio, can_edit_customer, can_view_all_agency, can_view_reports, can_update_own_only'
+        placeholders = ', '.join(['?'] * 10)
         for role, vals in defaults.items():
             cursor.execute("SELECT COUNT(*) FROM rol_yetkileri WHERE role = ?", (role,))
             if cursor.fetchone()[0] == 0:
                 cursor.execute(
-                    "INSERT INTO rol_yetkileri (role, can_delete_portfolio, can_edit_customer, can_view_all_agency, can_view_reports) VALUES (?, ?, ?, ?, ?)",
+                    f"INSERT INTO rol_yetkileri ({insert_cols}) VALUES ({placeholders})",
                     (role, *vals)
+                )
+            else:
+                # Mevcut kayıtları güncelle (yeni eklenen sütunlar için)
+                cursor.execute(
+                    "UPDATE rol_yetkileri SET can_delete_portfolio=?, can_delete_customer=?, can_delete_meeting=?, can_delete_deal=?, can_edit_portfolio=?, can_edit_customer=?, can_view_all_agency=?, can_view_reports=?, can_update_own_only=? WHERE role=?",
+                    (*vals, role)
                 )
         conn.commit()
     except Exception as e:

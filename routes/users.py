@@ -139,15 +139,18 @@ def update_role_permissions():
             for role in ['admin', 'agent', 'assistant']:
                 role_data = data.get(role, {})
                 cursor.execute('''
-                    INSERT OR REPLACE INTO rol_yetkileri
-                    (role, can_delete_portfolio, can_edit_customer, can_view_all_agency, can_view_reports)
-                    VALUES (?, ?, ?, ?, ?)
+                    UPDATE rol_yetkileri SET
+                        can_delete_portfolio = ?,
+                        can_edit_customer = ?,
+                        can_view_all_agency = ?,
+                        can_view_reports = ?
+                    WHERE role = ?
                 ''', (
-                    role,
                     1 if role_data.get('can_delete_portfolio') else 0,
                     1 if role_data.get('can_edit_customer') else 0,
                     1 if role_data.get('can_view_all_agency') else 0,
                     1 if role_data.get('can_view_reports') else 0,
+                    role
                 ))
             conn.commit()
 

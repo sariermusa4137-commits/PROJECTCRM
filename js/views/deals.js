@@ -1,6 +1,6 @@
 // Gayrimenkul CRM - Süreç Yönetimi (Deal Flow Checklist & Financial Commission Panel)
 
-import { state, addRecord, updateRecord, deleteRecord, logDealEventToTimelines } from '../store.js';
+import { state, addRecord, updateRecord, deleteRecord, logDealEventToTimelines, canDelete } from '../store.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
 
 export function renderDealsView(container) {
@@ -436,7 +436,7 @@ function renderDealDetailsModalContent(deal) {
                 </div>
 
                 <div style="display: flex; justify-content: space-between; gap: 12px;">
-                    <button id="btn-delete-deal" class="btn btn-danger btn-sm" style="flex-grow: 1;">Süreci Sil / İptal Et</button>
+                    ${canDelete() ? '<button id="btn-delete-deal" class="btn btn-danger btn-sm" style="flex-grow: 1;">Süreci Sil / İptal Et</button>' : ''}
                     <button id="btn-close-details" class="btn btn-secondary btn-sm">Kapat</button>
                 </div>
             </div>
@@ -542,29 +542,32 @@ function renderDealDetailsModalContent(deal) {
     document.getElementById('btn-close-details').addEventListener('click', closeModal);
 
     // Attach Delete Button listener
-    document.getElementById('btn-delete-deal').addEventListener('click', async () => {
-        if (confirm("Bu satış/tapu sürecini silmek istediğinize emin misiniz? Portföy durumu aktif hale getirilecektir.")) {
-            try {
-                // Delete deal record
-                await deleteRecord("deals", deal.id);
-                
-                // Return portfolio status back to "Aktif"
-                await updateRecord("portfolios", deal.portfolioId, { status: "Aktif" });
+    const btnDeleteDeal = document.getElementById('btn-delete-deal');
+    if (btnDeleteDeal) {
+        btnDeleteDeal.addEventListener('click', async () => {
+            if (confirm("Bu satış/tapu sürecini silmek istediğinize emin misiniz? Portföy durumu aktif hale getirilecektir.")) {
+                try {
+                    // Delete deal record
+                    await deleteRecord("deals", deal.id);
+                    
+                    // Return portfolio status back to "Aktif"
+                    await updateRecord("portfolios", deal.portfolioId, { status: "Aktif" });
 
-                // Log deletion on customer timelines
-                await logDealEventToTimelines(
-                    deal,
-                    "Satış Süreci İptal Edildi",
-                    `"${deal.portfolioTitle}" gayrimenkulü satış süreci iptal edildi ve silindi. (İşlem: ${state.currentUser.displayName})`,
-                    "Süreç"
-                );
+                    // Log deletion on customer timelines
+                    await logDealEventToTimelines(
+                        deal,
+                        "Satış Süreci İptal Edildi",
+                        `"${deal.portfolioTitle}" gayrimenkulü satış süreci iptal edildi ve silindi. (İşlem: ${state.currentUser.displayName})`,
+                        "Süreç"
+                    );
 
-                showToast("Satış süreci silindi ve portföy tekrar aktife alındı.", "info");
-                closeModal();
-                renderDealsView(document.getElementById('app-view'));
-            } catch (err) {
-                showToast("Süreç silinemedi: " + err.message, "error");
+                    showToast("Satış süreci silindi ve portföy tekrar aktife alındı.", "info");
+                    closeModal();
+                    renderDealsView(document.getElementById('app-view'));
+                } catch (err) {
+                    showToast("Süreç silinemedi: " + err.message, "error");
+                }
             }
-        }
-    });
+        });
+    }
 }
