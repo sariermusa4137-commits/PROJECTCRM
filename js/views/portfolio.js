@@ -21,6 +21,20 @@ function getAgeSelectValue(age) {
     return "31 Yıl ve Üzeri";
 }
 
+function getFullLocationString(p) {
+    let city = p.city;
+    if (!city && p.district && turkeyZonesData) {
+        const upperDistrict = p.district.toLocaleUpperCase('tr');
+        const resolvedCity = Object.keys(turkeyZonesData).find(c => {
+            const districtsOfCity = Object.keys(turkeyZonesData[c]);
+            return districtsOfCity.some(d => d.toLocaleUpperCase('tr') === upperDistrict);
+        });
+        if (resolvedCity) city = resolvedCity;
+    }
+    if (!city) city = 'İstanbul';
+    return `${city} / ${p.district || ''} / ${p.neighborhood || ''}`;
+}
+
 let activeFilters = {
     search: '',
     type: 'Hepsi',
@@ -30,6 +44,7 @@ let activeFilters = {
 let tempCoordinates = { lat: 40.9800, lng: 29.0800 };
 
 export function renderPortfolioView(container) {
+    loadTurkeyZonesData();
     if (container.querySelector('#map-container')) {
         updatePortfolioList();
         return;
@@ -238,7 +253,7 @@ function updatePortfolioList() {
                         </div>
                         <div class="portfolio-location">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-md" style="color:var(--primary);"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
-                            <span>${p.city ? p.city + ' / ' : ''}${p.district} / ${p.neighborhood}</span>
+                            <span>${getFullLocationString(p)}</span>
                         </div>
                     </div>
                     <div class="portfolio-bottom">
@@ -282,7 +297,7 @@ function formatDate(dateString) {
 }
 
 // Open Detail Modal
-function openPortfolioDetailModal(p) {
+export function openPortfolioDetailModal(p) {
     const formattedPrice = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(p.price);
     const formatComm = p.commission ? `%${p.commission}` : "-";
     const matchingBuyers = getMatchesForPortfolio(p);
@@ -367,7 +382,7 @@ function openPortfolioDetailModal(p) {
                         </div>
                         <div class="spec-entry">
                             <span class="spec-entry-label">Konum</span>
-                            <span class="spec-entry-value">${p.city ? p.city + ' / ' : ''}${p.district} / ${p.neighborhood}</span>
+                            <span class="spec-entry-value">${getFullLocationString(p)}</span>
                         </div>
                         <div class="spec-entry">
                             <span class="spec-entry-label">Bina Yaşı</span>

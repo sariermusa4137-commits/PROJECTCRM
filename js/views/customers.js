@@ -563,7 +563,7 @@ function openCustomerDetailModal(c) {
                                 <div class="match-item" style="background:rgba(99, 102, 241, 0.08); border:1px solid rgba(99, 102, 241, 0.2); padding:10px; border-radius:var(--border-radius-sm); display:flex; justify-content:space-between; align-items:center;">
                                     <div class="match-client-info" style="display:flex; flex-direction:column;">
                                         <span class="match-name" style="font-size:12px; font-weight:600; color:var(--text-primary);">${p.title}</span>
-                                        <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${p.city ? p.city + ' / ' : ''}${p.district || p.bolge || ''} / ${p.neighborhood || ''}, ${p.rooms || p.oda_sayisi || ''} | ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(p.price || p.fiyat)}</span>
+                                        <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${p.city || 'İstanbul'} / ${p.district || p.bolge || ''} / ${p.neighborhood || ''}, ${p.rooms || p.oda_sayisi || ''} | ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(p.price || p.fiyat)}</span>
                                     </div>
                                     <button class="btn btn-primary btn-view-p" data-id="${p.id}" style="padding:6px 12px; font-size:11px;">İlana Git</button>
                                 </div>
@@ -586,7 +586,7 @@ function openCustomerDetailModal(c) {
                                 <div class="match-item" style="background:rgba(168, 85, 247, 0.08); border:1px solid rgba(168, 85, 247, 0.2); padding:10px; border-radius:var(--border-radius-sm); display:flex; justify-content:space-between; align-items:center;">
                                     <div class="match-client-info" style="display:flex; flex-direction:column;">
                                         <span class="match-name" style="font-size:12px; font-weight:600; color:var(--text-primary);">${p.title}</span>
-                                        <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${p.city ? p.city + ' / ' : ''}${p.district || p.bolge || ''} / ${p.neighborhood || ''}, ${p.rooms || p.oda_sayisi || ''} | ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(p.price || p.fiyat)}</span>
+                                        <span class="match-criteria" style="font-size:10px; color:var(--text-secondary);">${p.city || 'İstanbul'} / ${p.district || p.bolge || ''} / ${p.neighborhood || ''}, ${p.rooms || p.oda_sayisi || ''} | ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(p.price || p.fiyat)}</span>
                                     </div>
                                     <button class="btn btn-primary btn-view-p-owner" data-id="${p.id}" style="padding:6px 12px; font-size:11px; background: #a855f7; border-color: #a855f7;">İlana Git</button>
                                 </div>
@@ -702,11 +702,11 @@ function openCustomerDetailModal(c) {
             const property = state.portfolios.find(p => p.id === pid);
             if (property) {
                 closeModal();
+                window.location.hash = "#portfolio";
                 import('./portfolio.js').then(module => {
                     setTimeout(() => {
-                        window.location.hash = "#portfolio";
-                        showToast(`Seçilen ilan listelendi.`, "info");
-                    }, 100);
+                        module.openPortfolioDetailModal(property);
+                    }, 200);
                 });
             }
         });
@@ -720,10 +720,11 @@ function openCustomerDetailModal(c) {
             const property = state.portfolios.find(p => p.id === pid);
             if (property) {
                 closeModal();
+                window.location.hash = "#portfolio";
                 import('./portfolio.js').then(module => {
                     setTimeout(() => {
-                        window.location.hash = "#portfolio";
-                    }, 100);
+                        module.openPortfolioDetailModal(property);
+                    }, 200);
                 });
             }
         });

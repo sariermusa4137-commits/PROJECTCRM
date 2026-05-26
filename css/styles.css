@@ -3127,4 +3127,9 @@ textarea {
     color: #c084fc !important;
 }
 
+/* General Display Utilities */
+.hidden {
+    display: none !important;
+}
+
 

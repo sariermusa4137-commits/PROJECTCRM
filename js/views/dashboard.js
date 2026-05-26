@@ -133,7 +133,7 @@ export function renderDashboardView(container) {
                             ${opp.customer.name} ↔ ${opp.portfolio.title}
                         </div>
                         <div style="font-size: 11px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 2px;">
-                            <span style="display: flex; align-items: center; gap: 4px;">📍 ${opp.portfolio.neighborhood ? opp.portfolio.neighborhood + ', ' : ''}${opp.portfolio.district}</span>
+                            <span style="display: flex; align-items: center; gap: 4px;">📍 ${opp.portfolio.city ? opp.portfolio.city + ' / ' : ''}${opp.portfolio.district} / ${opp.portfolio.neighborhood}</span>
                             <span style="display: flex; align-items: center; gap: 4px;">🛏️ ${opp.portfolio.rooms}</span>
                             <span style="display: flex; align-items: center; gap: 4px;">💰 ${formatPrice(opp.portfolio.price)}</span>
                         </div>
@@ -247,7 +247,7 @@ export function renderDashboardView(container) {
                                         ${opp.customer.name} ↔ ${opp.portfolio.title}
                                     </div>
                                     <div style="font-size: 11px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 2px;">
-                                        <span style="display: flex; align-items: center; gap: 4px;">📍 ${opp.portfolio.neighborhood ? opp.portfolio.neighborhood + ', ' : ''}${opp.portfolio.district}</span>
+                                        <span style="display: flex; align-items: center; gap: 4px;">📍 ${opp.portfolio.city ? opp.portfolio.city + ' / ' : ''}${opp.portfolio.district} / ${opp.portfolio.neighborhood}</span>
                                         <span style="display: flex; align-items: center; gap: 4px;">🛏️ ${opp.portfolio.rooms}</span>
                                         <span style="display: flex; align-items: center; gap: 4px;">💰 ${formatPrice(opp.portfolio.price)}</span>
                                     </div>

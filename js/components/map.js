@@ -78,7 +78,7 @@ export function renderPortfolioMarkers(portfolios, onMarkerClick) {
                 <img src="${p.imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=500&auto=format&fit=crop&q=60'}" 
                      style="width: 100%; height: 90px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;">
                 <h4 style="margin: 0 0 4px 0; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.title}</h4>
-                <p style="margin: 0 0 6px 0; font-size: 11px; color: #94a3b8;">${p.district}, ${p.neighborhood}</p>
+                <p style="margin: 0 0 6px 0; font-size: 11px; color: #94a3b8;">${p.city ? p.city + ' / ' : ''}${p.district} / ${p.neighborhood}</p>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 13px; font-weight: 700; color: #10b981;">${formatPrice}</span>
                     <span style="font-size: 9px; font-weight: 600; text-transform: uppercase; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; color: #94a3b8;">${p.rooms}</span>
