@@ -119,7 +119,7 @@ export function renderLocationsView(container) {
             btnRefresh.addEventListener('click', () => {
                 const activeLoc = state.locations.find(l => l.id === activeLocationId);
                 if (activeLoc) {
-                    loadNewsForRegion(activeLoc.name, true);
+                    loadNewsForRegion(activeLoc.id, true);
                 }
             });
         }
@@ -308,92 +308,100 @@ function renderLocationDetails() {
     });
 
     // Trigger loading of news for this region
-    loadNewsForRegion(loc.name);
+    loadNewsForRegion(loc.id);
 }
 
-// Load and display news feed cards with summaries for active region
-async function loadNewsForRegion(regionName, forceRefresh = false) {
+// Load and display AI market summary for active region
+async function loadNewsForRegion(locationId, forceRefresh = false) {
     const feedContainer = document.getElementById('news-feed-container');
     if (!feedContainer) return;
 
-    // Filter regional news
-    let regionNews = (state.regionNews || []).filter(n => n.region.toLowerCase() === regionName.toLowerCase());
-
-    if (regionNews.length === 0 || forceRefresh) {
-        // Show skeleton loading state
-        feedContainer.innerHTML = `
-            <div style="display:flex; flex-direction:column; gap:12px; padding: 10px 0;">
-                <div class="skeleton-news" style="height:90px; border-radius:var(--border-radius-md); background:rgba(255,255,255,0.015); border: 1px solid var(--border-color); animation: pulse 1.5s infinite ease-in-out;"></div>
-                <div class="skeleton-news" style="height:90px; border-radius:var(--border-radius-md); background:rgba(255,255,255,0.015); border: 1px solid var(--border-color); animation: pulse 1.5s infinite ease-in-out;"></div>
-                <div class="skeleton-news" style="height:90px; border-radius:var(--border-radius-md); background:rgba(255,255,255,0.015); border: 1px solid var(--border-color); animation: pulse 1.5s infinite ease-in-out;"></div>
-            </div>
-        `;
-        
-        // Show spinning refresh icon
-        const refreshIcon = document.getElementById('icon-refresh');
-        if (refreshIcon) refreshIcon.classList.add('spin-animation');
-
-        try {
-            await triggerNewsScraper(regionName);
-            // Re-fetch
-            regionNews = (state.regionNews || []).filter(n => n.region.toLowerCase() === regionName.toLowerCase());
-        } catch (e) {
-            console.error("Error loading news scraper", e);
-            feedContainer.innerHTML = `<p style="color:#ef4444; font-size:12px; text-align:center; padding: 20px 0;">Haberler taranırken veya AI ile özetlenirken hata oluştu.</p>`;
-            return;
-        } finally {
-            if (refreshIcon) refreshIcon.classList.remove('spin-animation');
-        }
-    }
-
-    if (regionNews.length === 0) {
-        feedContainer.innerHTML = `<p style="color:var(--text-muted); font-size:12px; text-align:center; padding: 30px 0;">Bu bölge için taranmış canlı pazar verisi bulunmamaktadır.</p>`;
+    const loc = state.locations.find(l => l.id === locationId);
+    if (!loc) {
+        feedContainer.innerHTML = `<p style="color:var(--text-muted); font-size:12px; text-align:center; padding: 30px 0;">Bölge bulunamadı.</p>`;
         return;
     }
 
-    // Sort news by date descending
-    regionNews.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    feedContainer.innerHTML = regionNews.map(item => {
-        const timeAgo = formatTimeAgo(new Date(item.date));
-        return `
-            <div class="card news-card" style="padding:14px; background:rgba(255,255,255,0.015); border:1px solid var(--border-color); border-radius:var(--border-radius-md); transition: transform 0.2s, box-shadow 0.2s; cursor: pointer;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span class="badge" style="font-size:9px; background:rgba(234, 88, 12, 0.1); color:#ea580c; border:1px solid rgba(234, 88, 12, 0.2); padding: 2px 6px; font-weight:600;">${item.source}</span>
-                    <span style="font-size:10px; color:var(--text-muted);">${timeAgo}</span>
-                </div>
-                <h4 class="news-title" style="font-size:13px; font-weight:600; margin-bottom:6px; line-height:1.4; color:var(--text-primary);">${item.title}</h4>
-                
-                <!-- Summary bubble -->
-                <div class="news-summary-box" style="margin-top:8px; padding:10px 12px; background:rgba(234, 88, 12, 0.02); border-left:2px solid #ea580c; border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;">
-                    <span style="font-size:9px; font-weight:700; color:#ea580c; text-transform:uppercase; display:block; margin-bottom:4px; letter-spacing:0.5px;">✨ AI Özet</span>
-                    <p style="font-size:11px; line-height:1.4; color:var(--text-secondary); font-style:italic; margin:0;">"${item.summary}"</p>
-                </div>
-                
-                <!-- Expandable Original Content -->
-                <div class="news-full-content" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color); font-size:11px; line-height:1.5; color:var(--text-muted);">
-                    ${item.content}
-                </div>
+    if (!loc.ai_summary && !forceRefresh) {
+        feedContainer.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 40px 20px; text-align:center; color: var(--text-muted);">
+                <span style="font-size: 24px; margin-bottom: 8px;">📡</span>
+                <p style="font-size:12px; margin: 0 0 12px 0;">Bu bölge için tanımlanmış canlı pazar verisi bulunmamaktadır.</p>
+                <p style="font-size:11px; color: var(--text-secondary); margin: 0;">AI piyasa analizini başlatmak için <b>Yenile</b> butonuna tıklayın.</p>
             </div>
         `;
-    }).join('');
+        return;
+    }
 
-    // Attach expand/collapse toggle
-    const newsCards = feedContainer.querySelectorAll('.news-card');
-    newsCards.forEach(card => {
-        const fullContent = card.querySelector('.news-full-content');
-        card.addEventListener('click', (e) => {
-            // Ignore if clicking on other interactive elements inside (if any)
-            const isVisible = fullContent.style.display === 'block';
-            fullContent.style.display = isVisible ? 'none' : 'block';
-            card.style.transform = isVisible ? 'none' : 'translateY(-2px)';
-            card.style.boxShadow = isVisible ? 'none' : '0 4px 12px rgba(0,0,0,0.15)';
+    if (loc.ai_summary && !forceRefresh) {
+        renderAISummary(feedContainer, loc.name, loc.ai_summary);
+        return;
+    }
+
+    // Show spinner/loading state
+    feedContainer.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 40px 0; gap: 12px; color: var(--text-secondary);">
+            <div class="spinner" style="border-top-color: #8b5cf6;"></div>
+            <p style="font-size:12px;">AI Piyasa Analizi üretiliyor...</p>
+        </div>
+    `;
+
+    const refreshIcon = document.getElementById('icon-refresh');
+    if (refreshIcon) refreshIcon.classList.add('spin-animation');
+
+    try {
+        const response = await fetch(`/api/locations/${locationId}/ai-summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
         });
-    });
+        const data = await response.json();
+        
+        if (response.ok && data.summary) {
+            // Update local state
+            loc.ai_summary = data.summary;
+            renderAISummary(feedContainer, loc.name, data.summary);
+            showToast("AI piyasa analizi başarıyla güncellendi.", "success");
+        } else {
+            const errMsg = data.error || "AI Analiz üretilirken hata oluştu.";
+            feedContainer.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 30px 20px; text-align:center;">
+                    <p style="color:#ef4444; font-size:12px; margin:0 0 8px 0;">${errMsg}</p>
+                    <p style="font-size:11px; color:var(--text-muted); margin:0;">Lütfen geçerli bir Gemini API anahtarı kaydettiğinizden emin olun.</p>
+                </div>
+            `;
+            showToast(errMsg, "error");
+        }
+    } catch (e) {
+        console.error("Error loading AI summary", e);
+        feedContainer.innerHTML = `<p style="color:#ef4444; font-size:12px; text-align:center; padding: 20px 0;">Bağlantı hatası: AI Analizi alınamadı.</p>`;
+        showToast("Bağlantı hatası: AI Analizi alınamadı.", "error");
+    } finally {
+        if (refreshIcon) refreshIcon.classList.remove('spin-animation');
+    }
+}
+
+function renderAISummary(container, regionName, summaryText) {
+    container.innerHTML = `
+        <div class="card news-card" style="padding:16px; background:rgba(139, 92, 246, 0.04); border:1px solid rgba(139, 92, 246, 0.15); border-radius:var(--border-radius-md); position:relative; overflow:hidden; transition: transform 0.2s, box-shadow 0.2s;">
+            <div style="position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, rgba(0,0,0,0) 70%); pointer-events: none;"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span class="badge" style="font-size:9px; background:rgba(139, 92, 246, 0.12); color:#a855f7; border:1px solid rgba(139, 92, 246, 0.2); padding: 2px 6px; font-weight:700; display:flex; align-items:center; gap:4px;">
+                    ✨ AI Canlı Analiz
+                </span>
+                <span style="font-size:10px; color:var(--text-muted);">Güncel</span>
+            </div>
+            <h4 class="news-title" style="font-size:13px; font-weight:600; margin-bottom:8px; line-height:1.4; color:#c084fc; font-family:'Outfit', sans-serif;">
+                ${regionName} Piyasa Radarı
+            </h4>
+            <p style="font-size:12px; line-height:1.5; color:var(--text-secondary); margin:0;">
+                ${summaryText}
+            </p>
+        </div>
+    `;
 }
 
 // Setup the Gemini settings panel inputs, badges, and toggle transitions
-function setupGeminiSettings() {
+async function setupGeminiSettings() {
     const header = document.getElementById('gemini-settings-header');
     const body = document.getElementById('gemini-settings-body');
     const toggleIcon = document.getElementById('gemini-settings-toggle-icon');
@@ -410,45 +418,69 @@ function setupGeminiSettings() {
         toggleIcon.style.transform = isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)';
     });
 
-    // Check localStorage for key
-    const existingKey = localStorage.getItem("crm_gemini_api_key");
-    if (existingKey) {
-        apiKeyInput.value = existingKey;
-        statusBadge.textContent = "AI Aktif";
-        statusBadge.style.background = "rgba(16, 185, 129, 0.1)";
-        statusBadge.style.color = "#10b981";
-        statusBadge.style.border = "1px solid rgba(16, 185, 129, 0.2)";
-    } else {
-        statusBadge.textContent = "Hazır Şablon (Bölgesel)";
-        statusBadge.style.background = "rgba(100, 116, 139, 0.1)";
-        statusBadge.style.color = "#94a3b8";
-        statusBadge.style.border = "1px solid rgba(100, 116, 139, 0.2)";
-    }
-
-    // Save key action
-    btnSave.addEventListener('click', (e) => {
-        e.preventDefault();
-        const newKey = apiKeyInput.value.trim();
-        if (newKey) {
-            localStorage.setItem("crm_gemini_api_key", newKey);
-            showToast("Gemini API Anahtarı kaydedildi.", "success");
+    // Check backend API for key
+    try {
+        const res = await fetch('/api/settings/gemini');
+        const data = await res.json();
+        if (res.ok && data.apiKey) {
+            apiKeyInput.value = data.apiKey;
             statusBadge.textContent = "AI Aktif";
             statusBadge.style.background = "rgba(16, 185, 129, 0.1)";
             statusBadge.style.color = "#10b981";
             statusBadge.style.border = "1px solid rgba(16, 185, 129, 0.2)";
         } else {
-            localStorage.removeItem("crm_gemini_api_key");
-            showToast("Gemini API Anahtarı kaldırıldı. Şablonlar kullanılacak.", "info");
             statusBadge.textContent = "Hazır Şablon (Bölgesel)";
             statusBadge.style.background = "rgba(100, 116, 139, 0.1)";
             statusBadge.style.color = "#94a3b8";
             statusBadge.style.border = "1px solid rgba(100, 116, 139, 0.2)";
         }
+    } catch (e) {
+        console.error("Error loading Gemini key from settings backend", e);
+    }
+
+    // Save key action
+    btnSave.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const newKey = apiKeyInput.value.trim();
         
-        // Reload news feed for active region with new configuration
-        const activeLoc = state.locations.find(l => l.id === activeLocationId);
-        if (activeLoc) {
-            loadNewsForRegion(activeLoc.name, true);
+        btnSave.disabled = true;
+        btnSave.textContent = "Kaydediliyor...";
+        
+        try {
+            const response = await fetch('/api/settings/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey: newKey })
+            });
+            
+            if (response.ok) {
+                if (newKey) {
+                    showToast("Gemini API Anahtarı veritabanına kaydedildi.", "success");
+                    statusBadge.textContent = "AI Aktif";
+                    statusBadge.style.background = "rgba(16, 185, 129, 0.1)";
+                    statusBadge.style.color = "#10b981";
+                    statusBadge.style.border = "1px solid rgba(16, 185, 129, 0.2)";
+                } else {
+                    showToast("Gemini API Anahtarı kaldırıldı. Şablonlar kullanılacak.", "info");
+                    statusBadge.textContent = "Hazır Şablon (Bölgesel)";
+                    statusBadge.style.background = "rgba(100, 116, 139, 0.1)";
+                    statusBadge.style.color = "#94a3b8";
+                    statusBadge.style.border = "1px solid rgba(100, 116, 139, 0.2)";
+                }
+                
+                // Reload news feed for active region with new configuration
+                const activeLoc = state.locations.find(l => l.id === activeLocationId);
+                if (activeLoc) {
+                    loadNewsForRegion(activeLoc.id, true);
+                }
+            } else {
+                showToast("API Anahtarı kaydedilirken hata oluştu.", "error");
+            }
+        } catch (err) {
+            showToast("Bağlantı hatası: Anahtar kaydedilemedi.", "error");
+        } finally {
+            btnSave.disabled = false;
+            btnSave.textContent = "Kaydet";
         }
     });
 }

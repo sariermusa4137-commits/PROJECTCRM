@@ -238,6 +238,13 @@ def init_db():
             )
         ''')
 
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        ''')
+
         cursor.execute("SELECT COUNT(*) FROM financial_rates")
         if cursor.fetchone()[0] == 0:
             cursor.execute("INSERT INTO financial_rates (rate_key, rate_value, last_updated) VALUES ('mevduat_faizi', 50.0, datetime('now'))")
@@ -279,6 +286,7 @@ def init_db():
             ("portfolios", "inflation_estimate", "REAL DEFAULT 25"),
             ("customers", "client_type", "TEXT DEFAULT 'Alıcı'"),
             ("portfolios", "owner_id", "TEXT"),
+            ("locations", "ai_summary", "TEXT"),
         ]
         for table, col, col_type in alter_queries:
             try:

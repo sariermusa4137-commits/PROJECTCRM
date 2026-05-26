@@ -11,6 +11,7 @@ from flask import Blueprint, request, session, jsonify, current_app
 from werkzeug.utils import secure_filename
 from db import db_connection
 from auth_middleware import login_required
+import google.generativeai as genai
 
 data_bp = Blueprint('data', __name__)
 
@@ -379,3 +380,119 @@ def upload_portfolio_image():
 
     except Exception as e:
         return jsonify({"error": f"Yükleme hatası: {str(e)}"}), 500
+
+
+@data_bp.route('/api/settings/gemini', methods=['GET'])
+@login_required
+def get_gemini_setting():
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'gemini_api_key'")
+            row = cursor.fetchone()
+            api_key = row['value'] if row else ""
+            return jsonify({
+                "apiKey": api_key,
+                "has_key": bool(api_key)
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@data_bp.route('/api/settings/gemini', methods=['POST'])
+@login_required
+def save_gemini_setting():
+    try:
+        req_data = request.get_json() or {}
+        api_key = req_data.get('apiKey', '').strip()
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            if api_key:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('gemini_api_key', ?)",
+                    (api_key,)
+                )
+            else:
+                cursor.execute("DELETE FROM system_settings WHERE key = 'gemini_api_key'")
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@data_bp.route('/api/locations/<location_id>/ai-summary', methods=['POST'])
+@login_required
+def generate_location_ai_summary(location_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 1. Fetch Gemini API Key
+            cursor.execute("SELECT value FROM system_settings WHERE key = 'gemini_api_key'")
+            row = cursor.fetchone()
+            api_key = row['value'] if row else ""
+            if not api_key:
+                return jsonify({"error": "Gemini API anahtarı bulunamadı. Lütfen AI Yapay Zeka Ayarları'ndan kaydedin."}), 400
+
+            # 2. Fetch Location details
+            cursor.execute("SELECT * FROM locations WHERE id = ?", (location_id,))
+            loc_row = cursor.fetchone()
+            if not loc_row:
+                return jsonify({"error": "Bölge bulunamadı."}), 404
+
+            loc = dict(loc_row)
+
+            # 3. Calculate amortization
+            sqmPriceSale = float(loc.get('sqmPriceSale') or 0)
+            sqmPriceRent = float(loc.get('sqmPriceRent') or 0)
+            amortization = sqmPriceSale / (sqmPriceRent * 12.0) if sqmPriceRent > 0 else 0.0
+
+            # 4. Formulate prompt
+            trends_str = ""
+            if loc.get('trends'):
+                try:
+                    trends_list = json.loads(loc['trends'])
+                    trends_str = ", ".join([f"{t.get('year')}: {t.get('salePrice')} TL/m²" for t in trends_list])
+                except Exception:
+                    trends_str = str(loc['trends'])
+
+            prompt = f"""
+            Aşağıda gayrimenkul analiz verileri ve uzman danışman notları sunulan bölgeyi analiz et.
+            Bölge emlak piyasasının gidişatı hakkında 3-4 cümlelik, son derece profesyonel, çarpıcı, akıcı ve canlı bir piyasa radar özeti üret.
+            Metin doğrudan özetin kendisiyle başlamalı; "Bu veriler doğrultusunda...", "Bölge analizine göre..." gibi girişlerden kaçın ve pazarlamaya uygun, profesyonel bir dil kullan.
+
+            Bölge Adı: {loc.get('name')}
+            Ortalama Satılık m² Fiyatı: {sqmPriceSale:,.0f} TL
+            Ortalama Kiralık m² Fiyatı: {sqmPriceRent:,.0f} TL
+            Hesaplanan Amortisman Süresi: {amortization:.1f} Yıl
+            Demografik Yapı & Müşteri Profili: {loc.get('demographics') or 'Veri yok'}
+            Bölgedeki Rekabet ve Piyasa Dinamikleri: {loc.get('competitorNotes') or 'Veri yok'}
+            Uzmanın Genel Değerlendirme Notları: {loc.get('notes') or 'Veri yok'}
+            Yıllara Göre Satış Trendi: {trends_str or 'Veri yok'}
+            """
+
+            # 5. Connect to Google Gemini API
+            genai.configure(api_key=api_key)
+            try:
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content(prompt)
+                ai_summary = response.text.strip()
+            except Exception as e_flash:
+                print(f"Failed to use gemini-2.5-flash, trying gemini-1.5-flash. Error: {e_flash}")
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content(prompt)
+                ai_summary = response.text.strip()
+
+            # 6. Save the AI summary in the database
+            cursor.execute("UPDATE locations SET ai_summary = ? WHERE id = ?", (ai_summary, location_id))
+            conn.commit()
+
+            return jsonify({
+                "success": True,
+                "summary": ai_summary
+            })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"AI Analiz üretilirken hata oluştu: {str(e)}"}), 500
