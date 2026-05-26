@@ -1679,7 +1679,7 @@ textarea {
 
 .calendar-grid-header {
     display: grid !important;
-    grid-template-columns: repeat(7, 1fr) !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     width: 100% !important;
     gap: 8px;
     text-align: center;
@@ -1693,7 +1693,7 @@ textarea {
 
 .calendar-grid-days {
     display: grid !important;
-    grid-template-columns: repeat(7, 1fr) !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     width: 100% !important;
     gap: 8px;
 }
@@ -1706,6 +1706,8 @@ textarea {
     min-height: 90px !important;
     padding: 6px !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
+    min-width: 0 !important;
     border: 1px solid rgba(255, 255, 255, 0.04);
     background: rgba(30, 41, 59, 0.2);
     border-radius: var(--border-radius-md);
@@ -1772,7 +1774,8 @@ textarea {
     padding: 4px !important;
     width: 100% !important;
     box-sizing: border-box !important;
-    overflow: visible;
+    overflow: hidden !important;
+    min-width: 0 !important;
 }
 
 .calendar-event-pill {
@@ -1781,14 +1784,16 @@ textarea {
     color: #e2e8f0 !important;
     font-size: 11px !important;
     font-weight: 500 !important;
-    padding: 4px 8px !important;
+    padding: 4px 6px !important;
     border-radius: 4px !important;
     display: block !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
+    min-width: 0 !important;
     transition: transform 0.1s ease, filter 0.1s ease;
 }
 
