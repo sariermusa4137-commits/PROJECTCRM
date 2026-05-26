@@ -3,7 +3,6 @@
 import { state, addRecord, updateRecord, deleteRecord, getMatchesForPortfolio, canViewPhone, maskPhoneNumber, apiFetch, canDelete, canEditRecord } from '../store.js';
 import { initMap, renderPortfolioMarkers, enableLocationSelection, setSelectMarkerPosition } from '../components/map.js';
 import { openModal, closeModal, showToast } from '../components/ui.js';
-import { LOCATIONS_DATA } from '../locations_data.js';
 
 function getAgeSelectValue(age) {
     if (typeof age === 'string') {
@@ -168,8 +167,8 @@ export function renderPortfolioView(container) {
     }
 
     // Add Portfolio Button Click
-    document.getElementById('btn-add-portfolio').addEventListener('click', () => {
-        openAddPortfolioModal();
+    document.getElementById('btn-add-portfolio').addEventListener('click', async () => {
+        await openAddPortfolioModal();
     });
 }
 
@@ -494,9 +493,9 @@ function openPortfolioDetailModal(p) {
     });
     
     // 2. Edit Listing
-    document.getElementById('btn-edit-p').addEventListener('click', () => {
+    document.getElementById('btn-edit-p').addEventListener('click', async () => {
         closeModal();
-        openEditPortfolioModal(p);
+        await openEditPortfolioModal(p);
     });
     
     // 3. Delete Listing
@@ -549,9 +548,9 @@ async function loadFinancialAnalysis(p) {
             </div>
         `;
         if (canEditRecord(p)) {
-            document.getElementById('btn-edit-p-financial').addEventListener('click', () => {
+            document.getElementById('btn-edit-p-financial').addEventListener('click', async () => {
                 closeModal();
-                openEditPortfolioModal(p);
+                await openEditPortfolioModal(p);
             });
         }
         return;
@@ -831,8 +830,9 @@ function openSocialDraftModal(p) {
 }
 
 // Add Portfolio Modal Form
-function openAddPortfolioModal() {
+async function openAddPortfolioModal() {
     tempCoordinates = { lat: 40.9800, lng: 29.0800 };
+    await loadTurkeyZonesData();
     
     const content = `
         <form id="form-portfolio-add">
@@ -1153,8 +1153,9 @@ function openAddPortfolioModal() {
 }
 
 // Edit Portfolio Modal Form
-function openEditPortfolioModal(p) {
+async function openEditPortfolioModal(p) {
     tempCoordinates = { lat: p.latitude || 40.9800, lng: p.longitude || 29.0800 };
+    await loadTurkeyZonesData();
     const owner = state.customers.find(c => c.id === p.owner_id);
     const ownerName = owner ? owner.name : "";
     
@@ -1480,21 +1481,47 @@ function openEditPortfolioModal(p) {
     });
 }
 
+let turkeyZonesData = null;
+
+async function loadTurkeyZonesData() {
+    if (turkeyZonesData) return turkeyZonesData;
+    try {
+        const res = await fetch('/static/data/turkey_zones.json');
+        if (!res.ok) throw new Error("Veri seti yüklenemedi");
+        turkeyZonesData = await res.json();
+        return turkeyZonesData;
+    } catch (err) {
+        console.error("Failed to load Turkey zones JSON:", err);
+        showToast("Türkiye coğrafi veri seti yüklenemedi.", "error");
+        return null;
+    }
+}
+
 function initLocationChainedSelects(prefix, selectedCity = '', selectedDistrict = '', selectedNeighborhood = '') {
     const citySelect = document.getElementById(`${prefix}-city`);
     const districtSelect = document.getElementById(`${prefix}-district`);
     const neighborhoodSelect = document.getElementById(`${prefix}-neighborhood`);
 
     if (!citySelect || !districtSelect || !neighborhoodSelect) return;
+    if (!turkeyZonesData) {
+        showToast("Lokasyon verisi henüz yüklenmedi.", "error");
+        return;
+    }
 
-    // 1. Populate Cities
+    // 1. Populate Cities (Alphabetical Sorting)
+    const sortedCities = Object.keys(turkeyZonesData).sort((a, b) => a.localeCompare(b, 'tr'));
     citySelect.innerHTML = '<option value="">Şehir Seçin</option>' + 
-        Object.keys(LOCATIONS_DATA).map(city => `<option value="${city}">${city}</option>`).join('');
+        sortedCities.map(city => `<option value="${city}">${city}</option>`).join('');
 
     // Set initial city
     if (selectedCity) {
-        citySelect.value = selectedCity;
-        populateDistricts(selectedCity, selectedDistrict, selectedNeighborhood);
+        const matchedCity = sortedCities.find(c => c.toLocaleLowerCase('tr') === selectedCity.toLocaleLowerCase('tr'));
+        if (matchedCity) {
+            citySelect.value = matchedCity;
+            populateDistricts(matchedCity, selectedDistrict, selectedNeighborhood);
+        } else {
+            citySelect.value = selectedCity;
+        }
     }
 
     // City Change Event
@@ -1503,7 +1530,7 @@ function initLocationChainedSelects(prefix, selectedCity = '', selectedDistrict 
         if (!city) {
             districtSelect.innerHTML = '<option value="">İlçe Seçin</option>';
             districtSelect.disabled = true;
-            neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>';
+            neighborhoodSelect.innerHTML = '<option value="">Semt/Mahalle Seçin</option>';
             neighborhoodSelect.disabled = true;
         } else {
             populateDistricts(city);
@@ -1515,7 +1542,7 @@ function initLocationChainedSelects(prefix, selectedCity = '', selectedDistrict 
         const city = citySelect.value;
         const district = districtSelect.value;
         if (!district) {
-            neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>';
+            neighborhoodSelect.innerHTML = '<option value="">Semt/Mahalle Seçin</option>';
             neighborhoodSelect.disabled = true;
         } else {
             populateNeighborhoods(city, district);
@@ -1523,28 +1550,38 @@ function initLocationChainedSelects(prefix, selectedCity = '', selectedDistrict 
     });
 
     function populateDistricts(city, initDistrict = '', initNeighborhood = '') {
-        const districts = LOCATIONS_DATA[city] ? Object.keys(LOCATIONS_DATA[city]) : [];
+        const districts = turkeyZonesData[city] ? Object.keys(turkeyZonesData[city]).sort((a, b) => a.localeCompare(b, 'tr')) : [];
         districtSelect.innerHTML = '<option value="">İlçe Seçin</option>' +
             districts.map(d => `<option value="${d}">${d}</option>`).join('');
         districtSelect.disabled = false;
         
-        neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>';
+        neighborhoodSelect.innerHTML = '<option value="">Semt/Mahalle Seçin</option>';
         neighborhoodSelect.disabled = true;
 
         if (initDistrict) {
-            districtSelect.value = initDistrict;
-            populateNeighborhoods(city, initDistrict, initNeighborhood);
+            const matchedDistrict = districts.find(d => d.toLocaleLowerCase('tr') === initDistrict.toLocaleLowerCase('tr'));
+            if (matchedDistrict) {
+                districtSelect.value = matchedDistrict;
+                populateNeighborhoods(city, matchedDistrict, initNeighborhood);
+            } else {
+                districtSelect.value = initDistrict;
+            }
         }
     }
 
     function populateNeighborhoods(city, district, initNeighborhood = '') {
-        const neighborhoods = (LOCATIONS_DATA[city] && LOCATIONS_DATA[city][district]) ? LOCATIONS_DATA[city][district] : [];
-        neighborhoodSelect.innerHTML = '<option value="">Mahalle Seçin</option>' +
+        const neighborhoods = (turkeyZonesData[city] && turkeyZonesData[city][district]) ? [...turkeyZonesData[city][district]].sort((a, b) => a.localeCompare(b, 'tr')) : [];
+        neighborhoodSelect.innerHTML = '<option value="">Semt/Mahalle Seçin</option>' +
             neighborhoods.map(n => `<option value="${n}">${n}</option>`).join('');
         neighborhoodSelect.disabled = false;
 
         if (initNeighborhood) {
-            neighborhoodSelect.value = initNeighborhood;
+            const matchedNeighborhood = neighborhoods.find(n => n.toLocaleLowerCase('tr') === initNeighborhood.toLocaleLowerCase('tr'));
+            if (matchedNeighborhood) {
+                neighborhoodSelect.value = matchedNeighborhood;
+            } else {
+                neighborhoodSelect.value = initNeighborhood;
+            }
         }
     }
 }

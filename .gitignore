@@ -21,3 +21,7 @@ ENV/
 
 # Local configuration
 .env
+
+# SQLite temporary files
+projectcrm.db-shm
+projectcrm.db-wal
