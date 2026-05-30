@@ -7,7 +7,7 @@ current_year artık dinamik — datetime.date.today().year kullanılıyor.
 import datetime
 from flask import Blueprint, request, session, jsonify
 from db import db_connection
-from auth_middleware import login_required
+from auth_middleware import login_required, get_user_role_and_permissions
 
 calendar_bp = Blueprint('calendar', __name__)
 
@@ -21,66 +21,75 @@ def get_calendar_events():
         with db_connection() as conn:
             cursor = conn.cursor()
 
-            cursor.execute('SELECT role, agencyId FROM users WHERE uid = ?', (current_user_id,))
+            role, permissions = get_user_role_and_permissions(cursor, current_user_id)
+            cursor.execute('SELECT agency_id FROM users WHERE uid = ?', (current_user_id,))
             user_row = cursor.fetchone()
-            if not user_row:
-                return {"error": "Kullanıcı bulunamadı."}, 404
+            user_agency_id = user_row['agency_id'] if user_row else None
 
-            role = user_row['role'] or 'agent'
-            agency_id = user_row['agencyId']
+            # Resolve the filtering agency_id
+            filter_agency_id = None
+            if role == 'admin':
+                req_agency = request.args.get('agencyId')
+                if req_agency:
+                    cursor.execute('SELECT id FROM agencies WHERE id = ? OR agency_code = ?', (req_agency, req_agency))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        filter_agency_id = ag_row['id']
+            else:
+                filter_agency_id = user_agency_id
 
             # Müşterileri çek
-            if role == 'admin':
-                if agency_id:
-                    cursor.execute('SELECT * FROM customers WHERE agencyId = ?', (agency_id,))
-                else:
-                    cursor.execute('SELECT * FROM customers')
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute('SELECT * FROM customers')
             else:
-                if agency_id:
-                    cursor.execute(
-                        'SELECT * FROM customers WHERE agencyId = ? AND createdById = ?',
-                        (agency_id, current_user_id)
-                    )
+                if role != 'admin' and not permissions.get('can_view_all_agency', 1):
+                    if filter_agency_id is None:
+                        cursor.execute('SELECT * FROM customers WHERE agency_id IS NULL AND createdById = ?', (current_user_id,))
+                    else:
+                        cursor.execute('SELECT * FROM customers WHERE agency_id = ? AND createdById = ?', (filter_agency_id, current_user_id))
                 else:
-                    cursor.execute(
-                        'SELECT * FROM customers WHERE createdById = ?', (current_user_id,)
-                    )
+                    if filter_agency_id is None:
+                        cursor.execute('SELECT * FROM customers WHERE agency_id IS NULL')
+                    else:
+                        cursor.execute('SELECT * FROM customers WHERE agency_id = ?', (filter_agency_id,))
             customers = cursor.fetchall()
 
             # Görüşmeleri çek
-            if role == 'admin':
-                if agency_id:
-                    cursor.execute('SELECT * FROM meetings WHERE agencyId = ?', (agency_id,))
-                else:
-                    cursor.execute('SELECT * FROM meetings')
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute('SELECT * FROM meetings')
             else:
-                if agency_id:
-                    cursor.execute(
-                        'SELECT * FROM meetings WHERE agencyId = ? AND createdById = ?',
-                        (agency_id, current_user_id)
-                    )
+                if role != 'admin' and not permissions.get('can_view_all_agency', 1):
+                    if filter_agency_id is None:
+                        cursor.execute('SELECT * FROM meetings WHERE agency_id IS NULL AND createdById = ?', (current_user_id,))
+                    else:
+                        cursor.execute('SELECT * FROM meetings WHERE agency_id = ? AND createdById = ?', (filter_agency_id, current_user_id))
                 else:
-                    cursor.execute(
-                        'SELECT * FROM meetings WHERE createdById = ?', (current_user_id,)
-                    )
+                    if filter_agency_id is None:
+                        cursor.execute('SELECT * FROM meetings WHERE agency_id IS NULL')
+                    else:
+                        cursor.execute('SELECT * FROM meetings WHERE agency_id = ?', (filter_agency_id,))
             meetings = cursor.fetchall()
 
             # Anımsatıcıları (reminders) çek
-            if role == 'admin':
-                if agency_id:
-                    cursor.execute('SELECT * FROM reminders WHERE agencyId = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""', (agency_id,))
-                else:
-                    cursor.execute('SELECT * FROM reminders WHERE is_completed = 0 AND due_date IS NOT NULL AND due_date != ""')
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute('SELECT * FROM reminders WHERE is_completed = 0 AND due_date IS NOT NULL AND due_date != ""')
             else:
-                if agency_id:
-                    cursor.execute(
-                        'SELECT * FROM reminders WHERE agencyId = ? AND createdById = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""',
-                        (agency_id, current_user_id)
-                    )
+                if role != 'admin' and not permissions.get('can_view_all_agency', 1):
+                    if filter_agency_id is None:
+                        cursor.execute(
+                            'SELECT * FROM reminders WHERE agency_id IS NULL AND createdById = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""',
+                            (current_user_id,)
+                        )
+                    else:
+                        cursor.execute(
+                            'SELECT * FROM reminders WHERE agency_id = ? AND createdById = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""',
+                            (filter_agency_id, current_user_id)
+                        )
                 else:
-                    cursor.execute(
-                        'SELECT * FROM reminders WHERE createdById = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""', (current_user_id,)
-                    )
+                    if filter_agency_id is None:
+                        cursor.execute('SELECT * FROM reminders WHERE agency_id IS NULL AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""')
+                    else:
+                        cursor.execute('SELECT * FROM reminders WHERE agency_id = ? AND is_completed = 0 AND due_date IS NOT NULL AND due_date != ""', (filter_agency_id,))
             reminders = cursor.fetchall()
 
         events = []

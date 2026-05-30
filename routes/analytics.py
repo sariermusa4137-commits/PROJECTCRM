@@ -16,16 +16,29 @@ def get_roi_analysis(id):
     try:
         with db_connection() as conn:
             cursor = conn.cursor()
+            current_user_id = session.get('user_id')
+
+            # Fetch user's role and agency_id
+            cursor.execute('SELECT role, agency_id FROM users WHERE uid = ?', (current_user_id,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                return {"error": "Kullanıcı bulunamadı."}, 404
+            role = user_row['role'] or 'agent'
+            user_agency_id = user_row['agency_id']
             
             # Fetch portfolio details
             cursor.execute(
-                'SELECT price, current_rent, annual_growth_estimate, inflation_estimate FROM portfolios WHERE id = ?',
+                'SELECT price, current_rent, annual_growth_estimate, inflation_estimate, agency_id FROM portfolios WHERE id = ?',
                 (id,)
             )
             p = cursor.fetchone()
             
             if not p:
                 return {"error": "Portföy bulunamadı."}, 404
+
+            # Enforce agency isolation for non-admins
+            if role != 'admin' and p['agency_id'] != user_agency_id:
+                return {"error": "Bu portföyün ROI analizini görme yetkiniz bulunmamaktadır."}, 403
                 
             price = float(p['price'] or 0)
             current_rent = float(p['current_rent'] or 0)

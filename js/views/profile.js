@@ -105,7 +105,7 @@ export function renderProfileView(container) {
                                 <label for="p-agency-name">Aktif Acente / Çalışma Alanı Adı</label>
                                 <input type="text" id="p-agency-name" value="${state.agency ? state.agency.name : ''}" required placeholder="Örn: RE/MAX İkon">
                                 <span style="font-size:11px; color:var(--text-muted); display:block; margin-top:6px;">
-                                    ${state.agency && state.agency.id !== user.uid ? `Ortak Acente Kodu: <strong style="color:var(--secondary); letter-spacing:0.5px;">${state.agency.id}</strong> (Bu kodla çalışma arkadaşlarınız bağlanabilir)` : 'Şu anda bireysel çalışma alanındasınız.'}
+                                    ${state.agency && state.agency.agency_code ? `Ortak Acente Kodu: <strong style="color:var(--secondary); letter-spacing:0.5px;">${state.agency.agency_code}</strong> (Bu kodla çalışma arkadaşlarınız bağlanabilir)` : 'Şu anda bireysel çalışma alanındasınız.'}
                                 </span>
                             </div>
                             

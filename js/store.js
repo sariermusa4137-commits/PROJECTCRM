@@ -260,14 +260,15 @@ export async function createAgency(agencyName) {
     }
     const data = await res.json();
     state.agency = data.agency;
-    state.currentUser.agencyId = data.agency.id;
+    state.currentUser.agencyId = data.agency.agency_code;
+    state.currentUser.agency_id = data.agency.id;
     
     await fetchAllData(data.agency.id);
     startPolling();
     
     await logActivity(`${agencyName} acentesi oluşturuldu.`);
     notify();
-    return data.agency.id;
+    return data.agency.agency_code;
 }
 
 // Join Agency
@@ -284,7 +285,8 @@ export async function joinAgency(agencyCode) {
     }
     const data = await res.json();
     state.agency = data.agency;
-    state.currentUser.agencyId = data.agency.id;
+    state.currentUser.agencyId = data.agency.agency_code;
+    state.currentUser.agency_id = data.agency.id;
     
     await fetchAllData(data.agency.id);
     startPolling();

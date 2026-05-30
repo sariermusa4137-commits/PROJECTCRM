@@ -157,3 +157,39 @@ def update_role_permissions():
         return {"success": True}
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+@users_bp.route('/api/users/assign-agency', methods=['POST'])
+@login_required
+def assign_user_agency():
+    try:
+        current_user_id = session.get('user_id')
+        data = request.get_json() or {}
+        target_user_id = data.get('userId')
+        target_agency_id = data.get('agencyId')
+
+        if not target_user_id:
+            return {"error": "userId alanı zorunludur."}, 400
+
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+            current_user = cursor.fetchone()
+            if not current_user or current_user['role'] != 'admin':
+                return {"error": "Yetkisiz işlem. Yalnızca yöneticiler acente ataması yapabilir."}, 403
+
+            if target_agency_id is None or target_agency_id == "" or target_agency_id == "null":
+                cursor.execute('UPDATE users SET agency_id = NULL, agencyId = NULL WHERE uid = ?', (target_user_id,))
+            else:
+                cursor.execute('SELECT agency_code FROM agencies WHERE id = ?', (target_agency_id,))
+                agency_row = cursor.fetchone()
+                if not agency_row:
+                    return {"error": "Acente bulunamadı."}, 404
+                agency_code = agency_row['agency_code']
+                cursor.execute('UPDATE users SET agency_id = ?, agencyId = ? WHERE uid = ?', (target_agency_id, agency_code, target_user_id))
+            
+            conn.commit()
+
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}, 500

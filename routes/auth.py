@@ -36,18 +36,21 @@ def auth_register():
             uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, email))
             created_at = datetime.datetime.now().isoformat()
             display_name = f"{first_name} {last_name}".strip()
-            agency_id = uid
+            import random, string
+            agency_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
             agency_name = f"{display_name} (Bireysel)"
 
             cursor.execute(
-                'INSERT OR IGNORE INTO agencies (id, name, createdById, createdAt) VALUES (?, ?, ?, ?)',
-                (agency_id, agency_name, uid, created_at)
+                'INSERT INTO agencies (name, agency_code, created_at, created_by) VALUES (?, ?, ?, ?)',
+                (agency_name, agency_code, created_at, uid)
             )
+            agency_id = cursor.lastrowid
+            
             cursor.execute('''
-                INSERT INTO users (uid, displayName, email, photoURL, agencyId, createdAt,
+                INSERT INTO users (uid, displayName, email, photoURL, agencyId, agency_id, createdAt,
                                    firstName, lastName, phone, password, profile_image)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (uid, display_name, email, "", agency_id, created_at,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (uid, display_name, email, "", agency_code, agency_id, created_at,
                   first_name, last_name, "", hashed_password, ""))
             conn.commit()
 
@@ -87,11 +90,19 @@ def auth_login():
                 return {"error": "E-posta adresi veya şifre hatalı."}, 401
 
             agency_data = None
-            if user_data['agencyId']:
-                cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_data['agencyId'],))
-                agency = cursor.fetchone()
-                if agency:
-                    agency_data = dict(agency)
+            agency_row = None
+            if user_data.get('agency_id'):
+                cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_data['agency_id'],))
+                agency_row = cursor.fetchone()
+            if not agency_row and user_data.get('agencyId'):
+                cursor.execute('SELECT * FROM agencies WHERE agency_code = ?', (user_data['agencyId'],))
+                agency_row = cursor.fetchone()
+                if agency_row:
+                    cursor.execute('UPDATE users SET agency_id = ? WHERE uid = ?', (agency_row['id'], user_data['uid']))
+                    conn.commit()
+                    user_data['agency_id'] = agency_row['id']
+            if agency_row:
+                agency_data = dict(agency_row)
 
         session['user_id'] = user_data['uid']
         session.permanent = True
@@ -122,21 +133,51 @@ def auth_status():
 
             user_data = dict(user)
 
-            if not user_data.get('agencyId'):
-                user_data['agencyId'] = user_id
-                cursor.execute('UPDATE users SET agencyId = ? WHERE uid = ?', (user_id, user_id))
-                conn.commit()
+            user_agency_id = user_data.get('agency_id')
+            user_agency_code = user_data.get('agencyId')
 
-            cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_data['agencyId'],))
+            # Self-healing agency association
+            if not user_agency_code:
+                import random, string
+                user_agency_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                agency_name = f"{user_data.get('displayName', 'Kullanıcı')} (Bireysel)"
+                cursor.execute('''
+                    INSERT INTO agencies (name, agency_code, created_at, created_by) VALUES (?, ?, ?, ?)
+                ''', (agency_name, user_agency_code, datetime.datetime.now().isoformat(), user_id))
+                user_agency_id = cursor.lastrowid
+                cursor.execute('UPDATE users SET agencyId = ?, agency_id = ? WHERE uid = ?', (user_agency_code, user_agency_id, user_id))
+                conn.commit()
+                user_data['agencyId'] = user_agency_code
+                user_data['agency_id'] = user_agency_id
+            elif not user_agency_id:
+                cursor.execute('SELECT * FROM agencies WHERE agency_code = ?', (user_agency_code,))
+                agency = cursor.fetchone()
+                if not agency:
+                    agency_name = f"{user_data.get('displayName', 'Kullanıcı')} (Bireysel)"
+                    cursor.execute('''
+                        INSERT INTO agencies (name, agency_code, created_at, created_by) VALUES (?, ?, ?, ?)
+                    ''', (agency_name, user_agency_code, datetime.datetime.now().isoformat(), user_id))
+                    user_agency_id = cursor.lastrowid
+                else:
+                    user_agency_id = agency['id']
+                cursor.execute('UPDATE users SET agency_id = ? WHERE uid = ?', (user_agency_id, user_id))
+                conn.commit()
+                user_data['agency_id'] = user_agency_id
+
+            cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_agency_id,))
             agency = cursor.fetchone()
             if not agency:
                 agency_name = f"{user_data.get('displayName', 'Kullanıcı')} (Bireysel)"
                 cursor.execute('''
-                    INSERT INTO agencies (id, name, createdById, createdAt) VALUES (?, ?, ?, ?)
-                ''', (user_data['agencyId'], agency_name, user_id, datetime.datetime.now().isoformat()))
+                    INSERT INTO agencies (name, agency_code, created_at, created_by) VALUES (?, ?, ?, ?)
+                ''', (agency_name, user_agency_code, datetime.datetime.now().isoformat(), user_id))
                 conn.commit()
-                cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_data['agencyId'],))
+                user_agency_id = cursor.lastrowid
+                cursor.execute('UPDATE users SET agency_id = ? WHERE uid = ?', (user_agency_id, user_id))
+                conn.commit()
+                cursor.execute('SELECT * FROM agencies WHERE id = ?', (user_agency_id,))
                 agency = cursor.fetchone()
+                user_data['agency_id'] = user_agency_id
 
             agency_data = dict(agency) if agency else None
 

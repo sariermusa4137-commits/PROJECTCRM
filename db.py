@@ -52,6 +52,15 @@ def init_db():
     with db_connection() as conn:
         cursor = conn.cursor()
 
+        # Check if agencies table needs migration
+        cursor.execute("PRAGMA table_info(agencies)")
+        cols = [c[1] for c in cursor.fetchall()]
+        if cols and 'agency_code' not in cols:
+            try:
+                cursor.execute("ALTER TABLE agencies RENAME TO agencies_old")
+            except Exception as e:
+                print("Error renaming agencies:", e)
+
         # ------------------------------------------------------------------ #
         # Tablo Oluşturma                                                      #
         # ------------------------------------------------------------------ #
@@ -63,22 +72,25 @@ def init_db():
                 email TEXT UNIQUE,
                 photoURL TEXT,
                 agencyId TEXT,
+                agency_id INTEGER,
                 createdAt TEXT,
                 firstName TEXT,
                 lastName TEXT,
                 phone TEXT,
                 password TEXT,
                 profile_image TEXT,
-                role TEXT DEFAULT 'agent'
+                role TEXT DEFAULT 'agent',
+                FOREIGN KEY (agency_id) REFERENCES agencies(id)
             )
         ''')
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS agencies (
-                id TEXT PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
-                createdById TEXT,
-                createdAt TEXT
+                agency_code TEXT UNIQUE,
+                created_at TEXT,
+                created_by TEXT
             )
         ''')
 
@@ -269,23 +281,30 @@ def init_db():
         # Güvenli Kolon Migration (ALTER TABLE IF NOT EXISTS pattern)          #
         # ------------------------------------------------------------------ #
         alter_queries = [
+            ("users", "agency_id", "INTEGER"),
             ("users", "firstName", "TEXT"),
             ("users", "lastName", "TEXT"),
             ("users", "phone", "TEXT"),
             ("users", "password", "TEXT"),
             ("users", "profile_image", "TEXT"),
             ("users", "role", "TEXT DEFAULT 'agent'"),
+            ("customers", "agency_id", "INTEGER"),
             ("customers", "birth_date", "TEXT"),
             ("customers", "contract_end_date", "TEXT"),
             ("customers", "property_sold_date", "TEXT"),
             ("customers", "status", "TEXT DEFAULT 'aktif'"),
             ("customers", "status_preference", "TEXT DEFAULT 'Satılık'"),
+            ("portfolios", "agency_id", "INTEGER"),
             ("portfolios", "status", "TEXT DEFAULT 'aktif'"),
             ("portfolios", "current_rent", "REAL DEFAULT 0"),
             ("portfolios", "annual_growth_estimate", "REAL DEFAULT 15"),
             ("portfolios", "inflation_estimate", "REAL DEFAULT 25"),
-            ("customers", "client_type", "TEXT DEFAULT 'Alıcı'"),
             ("portfolios", "owner_id", "TEXT"),
+            ("meetings", "agency_id", "INTEGER"),
+            ("todos", "agency_id", "INTEGER"),
+            ("reminders", "agency_id", "INTEGER"),
+            ("activities", "agency_id", "INTEGER"),
+            ("deals", "agency_id", "INTEGER"),
             ("locations", "ai_summary", "TEXT"),
         ]
         for table, col, col_type in alter_queries:
@@ -293,6 +312,38 @@ def init_db():
                 cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
             except sqlite3.OperationalError:
                 pass  # Kolon zaten var
+
+        # Migrate data from agencies_old if it exists
+        try:
+            cursor.execute("SELECT id, name, createdById, createdAt FROM agencies_old")
+            rows = cursor.fetchall()
+            for r in rows:
+                old_id, name, created_by, created_at = r['id'], r['name'], r['createdById'], r['createdAt']
+                cursor.execute("SELECT COUNT(*) FROM agencies WHERE agency_code = ?", (old_id,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute('''
+                        INSERT INTO agencies (name, agency_code, created_at, created_by)
+                        VALUES (?, ?, ?, ?)
+                    ''', (name, old_id, created_at, created_by))
+            cursor.execute("DROP TABLE agencies_old")
+            conn.commit()
+            print("Successfully migrated agencies_old to new agencies table.", flush=True)
+        except sqlite3.OperationalError:
+            pass
+
+        # Sync agency_id column in related tables based on agencyId (text code)
+        try:
+            sync_tables = ["users", "portfolios", "customers", "meetings", "todos", "reminders", "activities", "deals"]
+            for t in sync_tables:
+                cursor.execute(f"""
+                    UPDATE {t}
+                    SET agency_id = (SELECT id FROM agencies WHERE agencies.agency_code = {t}.agencyId)
+                    WHERE agencyId IS NOT NULL AND agency_id IS NULL
+                """)
+            conn.commit()
+            print("Successfully synchronized agency_id columns.", flush=True)
+        except Exception as e:
+            print("Error syncing agency_id values:", e, flush=True)
 
         # Set default values for empty statuses and financial projections
         try:

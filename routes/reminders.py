@@ -20,19 +20,39 @@ def get_reminders():
             cursor = conn.cursor()
             
             # Kullanıcı bilgilerini al
-            cursor.execute('SELECT role, agencyId FROM users WHERE uid = ?', (current_user_id,))
+            cursor.execute('SELECT role, agency_id, agencyId FROM users WHERE uid = ?', (current_user_id,))
             user_row = cursor.fetchone()
             if not user_row:
                 return {"error": "Kullanıcı bulunamadı."}, 404
                 
             role = user_row['role'] or 'agent'
-            agency_id = user_row['agencyId']
+            user_agency_id = user_row['agency_id']
+            
+            # Resolve filtering agency_id
+            filter_agency_id = None
+            if role == 'admin':
+                req_agency = request.args.get('agencyId')
+                if req_agency:
+                    cursor.execute('SELECT id FROM agencies WHERE id = ? OR agency_code = ?', (req_agency, req_agency))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        filter_agency_id = ag_row['id']
+                else:
+                    filter_agency_id = user_agency_id
+            else:
+                filter_agency_id = user_agency_id
             
             # Sorguyu çalıştır
             if role == 'admin':
-                cursor.execute('SELECT * FROM reminders WHERE agencyId = ? ORDER BY created_at DESC', (agency_id,))
+                if filter_agency_id is None:
+                    cursor.execute('SELECT * FROM reminders ORDER BY created_at DESC')
+                else:
+                    cursor.execute('SELECT * FROM reminders WHERE agency_id = ? ORDER BY created_at DESC', (filter_agency_id,))
             else:
-                cursor.execute('SELECT * FROM reminders WHERE agencyId = ? AND createdById = ? ORDER BY created_at DESC', (agency_id, current_user_id))
+                if filter_agency_id is None:
+                    cursor.execute('SELECT * FROM reminders WHERE agency_id IS NULL AND createdById = ? ORDER BY created_at DESC', (current_user_id,))
+                else:
+                    cursor.execute('SELECT * FROM reminders WHERE agency_id = ? AND createdById = ? ORDER BY created_at DESC', (filter_agency_id, current_user_id))
                 
             rows = cursor.fetchall()
             list_data = []
@@ -58,9 +78,10 @@ def create_reminder():
         with db_connection() as conn:
             cursor = conn.cursor()
             
-            cursor.execute('SELECT agencyId FROM users WHERE uid = ?', (current_user_id,))
+            cursor.execute('SELECT agency_id, agencyId FROM users WHERE uid = ?', (current_user_id,))
             user_row = cursor.fetchone()
-            agency_id = user_row['agencyId'] if user_row else None
+            agency_id = user_row['agency_id'] if user_row else None
+            agency_code = user_row['agencyId'] if user_row else None
             
             reminder_id = data.get('id') or str(uuid.uuid4())
             description = data.get('description', '')
@@ -70,8 +91,8 @@ def create_reminder():
             created_at = datetime.datetime.now().isoformat()
             
             cursor.execute(
-                "INSERT INTO reminders (id, agencyId, createdById, title, description, due_date, is_completed, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (reminder_id, agency_id, current_user_id, title, description, due_date, is_completed, category, created_at)
+                "INSERT INTO reminders (id, agencyId, agency_id, createdById, title, description, due_date, is_completed, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (reminder_id, agency_code, agency_id, current_user_id, title, description, due_date, is_completed, category, created_at)
             )
             conn.commit()
             
@@ -92,22 +113,24 @@ def update_reminder(id):
         with db_connection() as conn:
             cursor = conn.cursor()
             
-            cursor.execute('SELECT role, agencyId FROM users WHERE uid = ?', (current_user_id,))
+            cursor.execute('SELECT role, agency_id FROM users WHERE uid = ?', (current_user_id,))
             user_row = cursor.fetchone()
             if not user_row:
                 return {"error": "Kullanıcı bulunamadı."}, 404
                 
             role = user_row['role'] or 'agent'
-            agency_id = user_row['agencyId']
+            user_agency_id = user_row['agency_id']
             
-            if role == 'admin':
-                cursor.execute('SELECT * FROM reminders WHERE id = ? AND agencyId = ?', (id, agency_id))
-            else:
-                cursor.execute('SELECT * FROM reminders WHERE id = ? AND agencyId = ? AND createdById = ?', (id, agency_id, current_user_id))
-                
+            cursor.execute('SELECT * FROM reminders WHERE id = ?', (id,))
             reminder = cursor.fetchone()
             if not reminder:
-                return {"error": "Anımsatıcı bulunamadı veya yetkiniz yok."}, 404
+                return {"error": "Anımsatıcı bulunamadı."}, 404
+                
+            if role != 'admin' and reminder['agency_id'] != user_agency_id:
+                return {"error": "Bu işlem için yetkiniz bulunmamaktadır."}, 403
+                
+            if role != 'admin' and reminder['createdById'] != current_user_id:
+                return {"error": "Bu işlem için yetkiniz bulunmamaktadır."}, 403
                 
             title = data.get('title', reminder['title'])
             description = data.get('description', reminder['description'])
@@ -136,19 +159,19 @@ def delete_reminder(id):
         with db_connection() as conn:
             cursor = conn.cursor()
             
-            cursor.execute('SELECT role, agencyId FROM users WHERE uid = ?', (current_user_id,))
+            cursor.execute('SELECT role, agency_id FROM users WHERE uid = ?', (current_user_id,))
             user_row = cursor.fetchone()
             if not user_row:
                 return {"error": "Kullanıcı bulunamadı."}, 404
                 
             role = user_row['role'] or 'agent'
-            agency_id = user_row['agencyId']
+            user_agency_id = user_row['agency_id']
 
             # RBAC: Sadece admin silebilir
             if role != 'admin':
                 return {"error": "Anımsatıcı silme yetkiniz bulunmamaktadır."}, 403
 
-            cursor.execute('SELECT * FROM reminders WHERE id = ? AND agencyId = ?', (id, agency_id))
+            cursor.execute('SELECT * FROM reminders WHERE id = ?', (id,))
             reminder = cursor.fetchone()
             if not reminder:
                 return {"error": "Anımsatıcı bulunamadı."}, 404

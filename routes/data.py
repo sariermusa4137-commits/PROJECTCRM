@@ -53,9 +53,7 @@ def _serialize_record(collection: str, item: dict) -> dict:
 @login_required
 def get_all_data():
     try:
-        agency_id = request.args.get('agencyId')
-        if not agency_id:
-            return {"error": "agencyId parametresi gereklidir."}, 400
+        req_agency = request.args.get('agencyId')
 
         with db_connection() as conn:
             cursor = conn.cursor()
@@ -65,12 +63,34 @@ def get_all_data():
             role, permissions = get_user_role_and_permissions(cursor, current_user_id)
             can_view_all = permissions.get('can_view_all_agency', 1)
 
+            # Get user's agency_id (INTEGER) and agencyId (TEXT code)
+            cursor.execute('SELECT agency_id, agencyId FROM users WHERE uid = ?', (current_user_id,))
+            user_row = cursor.fetchone()
+            user_agency_id = user_row['agency_id'] if user_row else None
+
+            # Resolve the filtering agency_id
+            filter_agency_id = None
+            if role == 'admin':
+                if req_agency:
+                    # Resolve req_agency (could be integer ID or text code)
+                    cursor.execute('SELECT id FROM agencies WHERE id = ? OR agency_code = ?', (req_agency, req_agency))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        filter_agency_id = ag_row['id']
+                # If admin has no specific agency filtered, they see all agencies' data, so filter_agency_id is None
+            else:
+                filter_agency_id = user_agency_id
+
             response_data = {}
             for table in ALLOWED_COLLECTIONS:
-                query = f'SELECT * FROM {table} WHERE agencyId = ?'
-                params = [agency_id]
+                if role == 'admin' and filter_agency_id is None:
+                    query = f'SELECT * FROM {table}'
+                    params = []
+                else:
+                    query = f'SELECT * FROM {table} WHERE agency_id = ?'
+                    params = [filter_agency_id]
 
-                if not can_view_all:
+                if not can_view_all and role != 'admin':
                     if table in ['portfolios', 'customers', 'meetings', 'deals']:
                         query += ' AND createdById = ?'
                         params.append(current_user_id)
@@ -84,11 +104,9 @@ def get_all_data():
 
                 # Doğum günü etkinliklerini meetings'e ekle
                 if table == 'meetings':
-                    list_data = _inject_birthday_events(cursor, agency_id, current_user_id, can_view_all, list_data)
+                    list_data = _inject_birthday_events(cursor, filter_agency_id, current_user_id, can_view_all, list_data, role == 'admin')
 
                 # --- RBAC: Danışman (agent) maskeleme ---
-                # Agent rolü ve can_update_own_only aktifse, başkalarının portföylerinde
-                # hassas verileri (owner_id, notes) maskele
                 if table == 'portfolios' and role == 'agent' and permissions.get('can_update_own_only', 0):
                     for item in list_data:
                         if item.get('createdById') != current_user_id:
@@ -115,23 +133,30 @@ def get_all_data():
 
         return response_data
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}, 500
 
 
-def _inject_birthday_events(cursor, agency_id, current_user_id, can_view_all, list_data):
+def _inject_birthday_events(cursor, agency_id, current_user_id, can_view_all, list_data, is_admin):
     """Müşterilerin doğum günlerini takvim etkinliği olarak meetings listesine ekler."""
     try:
-        cust_query = 'SELECT id, name, birthDate, birth_date FROM customers WHERE agencyId = ?'
-        cust_params = [agency_id]
-        if not can_view_all:
-            cust_query += ' AND createdById = ?'
-            cust_params.append(current_user_id)
+        if is_admin and agency_id is None:
+            cust_query = 'SELECT id, name, birthDate, birth_date, agencyId FROM customers'
+            cust_params = []
+        else:
+            cust_query = 'SELECT id, name, birthDate, birth_date, agencyId FROM customers WHERE agency_id = ?'
+            cust_params = [agency_id]
+            if not can_view_all and not is_admin:
+                cust_query += ' AND createdById = ?'
+                cust_params.append(current_user_id)
         cursor.execute(cust_query, cust_params)
 
         today_year = datetime.date.today().year
         for c_row in cursor.fetchall():
             c_id = c_row['id']
             c_name = c_row['name']
+            c_agency_code = c_row['agencyId'] or ""
             b_str = c_row['birth_date'] or c_row['birthDate']
             if not b_str:
                 continue
@@ -147,7 +172,7 @@ def _inject_birthday_events(cursor, agency_id, current_user_id, can_view_all, li
                 for yr in [today_year - 1, today_year, today_year + 1]:
                     list_data.append({
                         "id": f"birthday-{c_id}-{yr}",
-                        "agencyId": agency_id,
+                        "agencyId": c_agency_code,
                         "createdById": "system",
                         "createdByName": "Sistem",
                         "createdAt": "",
@@ -180,6 +205,38 @@ def create_data_record(collection):
 
         with db_connection() as conn:
             cursor = conn.cursor()
+            current_user_id = session.get('user_id')
+
+            # Get user's role and agency details
+            cursor.execute('SELECT role, agency_id, agencyId FROM users WHERE uid = ?', (current_user_id,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                return {"error": "Kullanıcı bulunamadı."}, 404
+            
+            user_role = user_row['role']
+            user_agency_id = user_row['agency_id']
+            user_agency_code = user_row['agencyId']
+
+            if user_role != 'admin':
+                # Force non-admin to their own agency
+                data['agency_id'] = user_agency_id
+                data['agencyId'] = user_agency_code
+            else:
+                # Admin can specify. Sync agency_id <-> agencyId
+                req_agency_id = data.get('agency_id')
+                req_agency_code = data.get('agencyId')
+                
+                if req_agency_id and not req_agency_code:
+                    cursor.execute('SELECT agency_code FROM agencies WHERE id = ?', (req_agency_id,))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        data['agencyId'] = ag_row['agency_code']
+                elif req_agency_code and not req_agency_id:
+                    cursor.execute('SELECT id FROM agencies WHERE agency_code = ?', (req_agency_code,))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        data['agency_id'] = ag_row['id']
+
             record_id = data.get('id') or str(uuid.uuid4())
             data['id'] = record_id
 
@@ -233,6 +290,43 @@ def update_data_record(collection, id):
             cursor = conn.cursor()
             current_user_id = session.get('user_id')
 
+            # Get user's role and agency details
+            cursor.execute('SELECT role, agency_id, agencyId FROM users WHERE uid = ?', (current_user_id,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                return {"error": "Kullanıcı bulunamadı."}, 404
+            
+            user_role = user_row['role']
+            user_agency_id = user_row['agency_id']
+            user_agency_code = user_row['agencyId']
+
+            # Check if record exists and check agency isolation
+            cursor.execute(f"SELECT agency_id FROM {collection} WHERE id = ?", (id,))
+            rec = cursor.fetchone()
+            if not rec:
+                return {"error": "Kayıt bulunamadı."}, 404
+            
+            if user_role != 'admin':
+                if rec['agency_id'] != user_agency_id:
+                    return {"error": "Bu kaydı düzenleme yetkiniz bulunmamaktadır (Farklı acente verisi)."}, 403
+                # Prevent changing the agency
+                data['agency_id'] = user_agency_id
+                data['agencyId'] = user_agency_code
+            else:
+                # Admin can modify agency. Sync them if changed.
+                req_agency_id = data.get('agency_id')
+                req_agency_code = data.get('agencyId')
+                if req_agency_id and not req_agency_code:
+                    cursor.execute('SELECT agency_code FROM agencies WHERE id = ?', (req_agency_id,))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        data['agencyId'] = ag_row['agency_code']
+                elif req_agency_code and not req_agency_id:
+                    cursor.execute('SELECT id FROM agencies WHERE agency_code = ?', (req_agency_code,))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        data['agency_id'] = ag_row['id']
+
             # RBAC: Güncelleme izni kontrolü
             allowed, error_msg = check_update_permission(cursor, current_user_id, collection, id)
             if not allowed:
@@ -279,6 +373,20 @@ def delete_data_record(collection, id):
         with db_connection() as conn:
             cursor = conn.cursor()
             current_user_id = session.get('user_id')
+
+            # Get user's role and agency_id
+            cursor.execute('SELECT role, agency_id FROM users WHERE uid = ?', (current_user_id,))
+            user_row = cursor.fetchone()
+            user_role = user_row['role'] if user_row else 'agent'
+            user_agency_id = user_row['agency_id'] if user_row else None
+
+            # Enforce agency isolation for non-admins
+            if user_role != 'admin':
+                # Check if the record belongs to the user's agency
+                cursor.execute(f"SELECT agency_id FROM {collection} WHERE id = ?", (id,))
+                rec = cursor.fetchone()
+                if rec and rec['agency_id'] != user_agency_id:
+                    return {"error": "Bu kaydı silme yetkiniz bulunmamaktadır (Farklı acente verisi)."}, 403
 
             # RBAC: Silme izni kontrolü (tüm koleksiyonlar)
             allowed, error_msg = check_delete_permission(cursor, current_user_id, collection)

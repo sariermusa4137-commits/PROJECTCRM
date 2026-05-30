@@ -8,6 +8,21 @@ export async function updateUsersTable(container) {
     if (!tableBody) return;
 
     try {
+        const activeUser = state.currentUser;
+        const isAdmin = activeUser && activeUser.role === 'admin';
+
+        let agencies = [];
+        if (isAdmin) {
+            try {
+                const agRes = await apiFetch('/api/agencies');
+                if (agRes.ok) {
+                    agencies = await agRes.json();
+                }
+            } catch (e) {
+                console.error("Failed to load agencies in user list:", e);
+            }
+        }
+
         const res = await apiFetch('/api/users');
         if (!res.ok) {
             throw new Error("Kullanıcı listesi alınamadı.");
@@ -24,9 +39,6 @@ export async function updateUsersTable(container) {
             `;
             return;
         }
-
-        const activeUser = state.currentUser;
-        const isAdmin = activeUser && activeUser.role === 'admin';
 
         tableBody.innerHTML = users.map(user => {
             const avatar = user.profile_image || user.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=60";
@@ -59,6 +71,19 @@ export async function updateUsersTable(container) {
                    </button>` 
                 : '';
 
+            let officeHtml = `🏢 ${office}`;
+            if (isAdmin) {
+                const options = [
+                    `<option value="" ${!user.agency_id ? 'selected' : ''}>Bireysel</option>`,
+                    ...agencies.map(ag => `<option value="${ag.id}" ${user.agency_id === ag.id ? 'selected' : ''}>${ag.name}</option>`)
+                ].join('');
+                officeHtml = `
+                    <select class="agency-assign-select" data-uid="${user.uid}" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 6px 12px; color: var(--text-primary); font-size: 12px; cursor: pointer; outline: none; transition: all var(--transition-fast); width: 100%;">
+                        ${options}
+                    </select>
+                `;
+            }
+
             return `
                 <tr>
                     <td>
@@ -72,7 +97,7 @@ export async function updateUsersTable(container) {
                     </td>
                     <td style="font-size: 13px; color: var(--text-secondary);">${user.email}</td>
                     <td style="font-size: 13px; color: var(--text-secondary);">${dateStr}</td>
-                    <td style="font-size: 13px; color: var(--text-secondary);">🏢 ${office}</td>
+                    <td style="font-size: 13px; color: var(--text-secondary);">${officeHtml}</td>
                     <td>
                         <span style="${roleBadgeStyle}">${roleLabel}</span>
                     </td>
@@ -116,6 +141,38 @@ export async function updateUsersTable(container) {
                     updateUsersTable(container);
                 } catch (err) {
                     console.error("Failed to update role:", err);
+                    showToast(err.message, "error");
+                    updateUsersTable(container);
+                }
+            });
+        });
+
+        // Attach event listeners for agency assignment changes
+        const agencySelects = container.querySelectorAll('.agency-assign-select');
+        agencySelects.forEach(select => {
+            select.addEventListener('change', async (e) => {
+                const uid = select.getAttribute('data-uid');
+                const agencyId = select.value ? parseInt(select.value) : null;
+                
+                try {
+                    select.disabled = true;
+                    showToast("Acente ataması güncelleniyor...", "info");
+                    
+                    const response = await apiFetch('/api/users/assign-agency', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: uid, agencyId })
+                    });
+                    
+                    if (!response.ok) {
+                        const result = await response.json();
+                        throw new Error(result.error || "Acente ataması başarısız.");
+                    }
+                    
+                    showToast("Kullanıcı acentesi başarıyla güncellendi.", "success");
+                    updateUsersTable(container);
+                } catch (err) {
+                    console.error("Failed to update user agency:", err);
                     showToast(err.message, "error");
                     updateUsersTable(container);
                 }

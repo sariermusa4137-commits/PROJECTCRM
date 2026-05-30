@@ -5,8 +5,7 @@ Akıllı Eşleştirme Motoru (AI Matchmaking) API rotası.
 
 import re
 from flask import Blueprint, request, session, jsonify
-from db import db_connection
-from auth_middleware import login_required
+from auth_middleware import login_required, get_user_role_and_permissions
 
 matchmaking_bp = Blueprint('matchmaking', __name__)
 
@@ -30,29 +29,55 @@ def normalize_text(text):
 @login_required
 def get_matchmaking_opportunities():
     try:
-        agency_id = request.args.get('agencyId')
-        if not agency_id:
-            return {"error": "agencyId parametresi gereklidir."}, 400
-
         with db_connection() as conn:
             cursor = conn.cursor()
             current_user_id = session.get('user_id')
 
-            # Kullanıcı rolünü al
-            cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+            role, permissions = get_user_role_and_permissions(cursor, current_user_id)
+            cursor.execute('SELECT agency_id FROM users WHERE uid = ?', (current_user_id,))
             user_row = cursor.fetchone()
-            role = (user_row['role'] if user_row else None) or 'agent'
+            user_agency_id = user_row['agency_id'] if user_row else None
+            can_view_all = permissions.get('can_view_all_agency', 1)
+
+            # Resolve filtering agency_id
+            filter_agency_id = None
+            if role == 'admin':
+                req_agency = request.args.get('agencyId')
+                if req_agency:
+                    cursor.execute('SELECT id FROM agencies WHERE id = ? OR agency_code = ?', (req_agency, req_agency))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        filter_agency_id = ag_row['id']
+                else:
+                    filter_agency_id = user_agency_id
+            else:
+                filter_agency_id = user_agency_id
 
             # Portföyleri al (Aktif durumdakiler)
-            cursor.execute("SELECT * FROM portfolios WHERE agencyId = ? AND LOWER(status) = 'aktif'", (agency_id,))
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute("SELECT * FROM portfolios WHERE LOWER(status) = 'aktif'")
+            else:
+                if filter_agency_id is None:
+                    cursor.execute("SELECT * FROM portfolios WHERE agency_id IS NULL AND LOWER(status) = 'aktif'")
+                else:
+                    cursor.execute("SELECT * FROM portfolios WHERE agency_id = ? AND LOWER(status) = 'aktif'", (filter_agency_id,))
             portfolios = [dict(r) for r in cursor.fetchall()]
 
             # Müşterileri al (Alıcı tipindekiler ve durumu aktif olanlar)
             # Admin tüm acentenin müşterilerini, Agent/diğer roller sadece kendi müşterilerini görür
-            if role == 'admin':
-                cursor.execute("SELECT * FROM customers WHERE agencyId = ? AND type = 'Alıcı' AND LOWER(status) = 'aktif'", (agency_id,))
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute("SELECT * FROM customers WHERE type = 'Alıcı' AND LOWER(status) = 'aktif'")
             else:
-                cursor.execute("SELECT * FROM customers WHERE agencyId = ? AND type = 'Alıcı' AND LOWER(status) = 'aktif' AND createdById = ?", (agency_id, current_user_id))
+                if role != 'admin' and not can_view_all:
+                    if filter_agency_id is None:
+                        cursor.execute("SELECT * FROM customers WHERE agency_id IS NULL AND type = 'Alıcı' AND LOWER(status) = 'aktif' AND createdById = ?", (current_user_id,))
+                    else:
+                        cursor.execute("SELECT * FROM customers WHERE agency_id = ? AND type = 'Alıcı' AND LOWER(status) = 'aktif' AND createdById = ?", (filter_agency_id, current_user_id))
+                else:
+                    if filter_agency_id is None:
+                        cursor.execute("SELECT * FROM customers WHERE agency_id IS NULL AND type = 'Alıcı' AND LOWER(status) = 'aktif'")
+                    else:
+                        cursor.execute("SELECT * FROM customers WHERE agency_id = ? AND type = 'Alıcı' AND LOWER(status) = 'aktif'", (filter_agency_id,))
             
             customers = [dict(r) for r in cursor.fetchall()]
 

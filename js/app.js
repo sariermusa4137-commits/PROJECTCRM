@@ -13,6 +13,7 @@ import { renderProfileView } from './views/profile.js';
 import { renderUsersView } from './views/users.js';
 import { renderReportsView } from './views/reports.js';
 import { renderRemindersView } from './views/reminders.js';
+import { renderAgenciesView } from './views/agencies.js';
 import { showToast, openModal, closeModal } from './components/ui.js';
 
 // DOM Elements
@@ -144,7 +145,7 @@ function handleRouting() {
     }
 
     // Role-based route guard: Admin-only views
-    const adminOnlyViews = ['users', 'reports'];
+    const adminOnlyViews = ['users', 'reports', 'agencies'];
     if (isAuthenticated && adminOnlyViews.includes(hash.replace('#', '')) && !isAdmin()) {
         hash = '#forbidden';
         window.location.hash = '#forbidden';
@@ -179,6 +180,7 @@ function handleRouting() {
             users: "Danışman Kadrosu",
             reports: "Ciro Raporu",
             reminders: "Anımsatıcılar",
+            agencies: "Acente Yönetimi",
             forbidden: "Erişim Engellendi"
         };
         breadcrumbActive.textContent = viewTitles[viewName] || viewName.toUpperCase();
@@ -239,6 +241,9 @@ function renderActiveView(viewName) {
             break;
         case "reports":
             renderReportsView(appView);
+            break;
+        case "agencies":
+            renderAgenciesView(appView);
             break;
         case "reminders":
             renderRemindersView(appView);

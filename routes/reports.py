@@ -4,7 +4,7 @@ Ciro ve finansal rapor rotaları. topPerformers artık gerçek DB verisinden gel
 """
 
 import datetime
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from db import db_connection
 from auth_middleware import login_required, roles_accepted
 
@@ -16,32 +16,86 @@ reports_bp = Blueprint('reports', __name__)
 @roles_accepted('can_view_reports')
 def get_ciro_report():
     try:
-        agency_id = request.args.get('agencyId')
-        if not agency_id:
-            return {"error": "agencyId parametresi gereklidir."}, 400
+        current_user_id = session.get('user_id')
 
         with db_connection() as conn:
             cursor = conn.cursor()
 
+            # Kullanıcı bilgilerini al
+            cursor.execute('SELECT role, agency_id FROM users WHERE uid = ?', (current_user_id,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                return {"error": "Kullanıcı bulunamadı."}, 404
+                
+            role = user_row['role'] or 'agent'
+            user_agency_id = user_row['agency_id']
+
+            # Resolve filtering agency_id
+            filter_agency_id = None
+            if role == 'admin':
+                req_agency = request.args.get('agencyId')
+                if req_agency:
+                    cursor.execute('SELECT id FROM agencies WHERE id = ? OR agency_code = ?', (req_agency, req_agency))
+                    ag_row = cursor.fetchone()
+                    if ag_row:
+                        filter_agency_id = ag_row['id']
+            else:
+                filter_agency_id = user_agency_id
+
             # Toplam işlem hacmi
-            cursor.execute("SELECT SUM(agreedPrice) FROM deals WHERE agencyId = ?", (agency_id,))
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute("SELECT SUM(agreedPrice) FROM deals")
+            else:
+                if filter_agency_id is None:
+                    cursor.execute("SELECT SUM(agreedPrice) FROM deals WHERE agency_id IS NULL")
+                else:
+                    cursor.execute("SELECT SUM(agreedPrice) FROM deals WHERE agency_id = ?", (filter_agency_id,))
             total_deals_price = cursor.fetchone()[0] or 0
 
             # Aktif portföy değeri
-            cursor.execute("SELECT SUM(price) FROM portfolios WHERE agencyId = ?", (agency_id,))
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute("SELECT SUM(price) FROM portfolios")
+            else:
+                if filter_agency_id is None:
+                    cursor.execute("SELECT SUM(price) FROM portfolios WHERE agency_id IS NULL")
+                else:
+                    cursor.execute("SELECT SUM(price) FROM portfolios WHERE agency_id = ?", (filter_agency_id,))
             active_listings_val = cursor.fetchone()[0] or 0
 
             # Gerçek danışman performansı (deals tablosundan)
-            cursor.execute('''
-                SELECT createdByName AS name,
-                       COUNT(*) AS dealsCount,
-                       COALESCE(SUM(agreedPrice) * 0.04, 0) AS comm
-                FROM deals
-                WHERE agencyId = ?
-                GROUP BY createdByName
-                ORDER BY comm DESC
-                LIMIT 5
-            ''', (agency_id,))
+            if role == 'admin' and filter_agency_id is None:
+                cursor.execute('''
+                    SELECT createdByName AS name,
+                           COUNT(*) AS dealsCount,
+                           COALESCE(SUM(agreedPrice) * 0.04, 0) AS comm
+                    FROM deals
+                    GROUP BY createdByName
+                    ORDER BY comm DESC
+                    LIMIT 5
+                ''')
+            else:
+                if filter_agency_id is None:
+                    cursor.execute('''
+                        SELECT createdByName AS name,
+                               COUNT(*) AS dealsCount,
+                               COALESCE(SUM(agreedPrice) * 0.04, 0) AS comm
+                        FROM deals
+                        WHERE agency_id IS NULL
+                        GROUP BY createdByName
+                        ORDER BY comm DESC
+                        LIMIT 5
+                    ''')
+                else:
+                    cursor.execute('''
+                        SELECT createdByName AS name,
+                               COUNT(*) AS dealsCount,
+                               COALESCE(SUM(agreedPrice) * 0.04, 0) AS comm
+                        FROM deals
+                        WHERE agency_id = ?
+                        GROUP BY createdByName
+                        ORDER BY comm DESC
+                        LIMIT 5
+                    ''', (filter_agency_id,))
             top_performers = [
                 {"name": row['name'], "dealsCount": row['dealsCount'], "comm": round(row['comm'], 2)}
                 for row in cursor.fetchall()
