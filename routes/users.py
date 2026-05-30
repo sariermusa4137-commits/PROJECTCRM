@@ -17,11 +17,11 @@ def get_users():
         with db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT u.uid, u.displayName, u.email, u.photoURL, u.agencyId, u.createdAt,
+                SELECT u.uid, u.displayName, u.email, u.photoURL, u.agencyId, u.agency_id, u.createdAt,
                        u.firstName, u.lastName, u.phone, u.profile_image, u.role,
                        a.createdById AS agencyOwnerId, a.name AS agencyName
                 FROM users u
-                LEFT JOIN agencies a ON u.agencyId = a.id
+                LEFT JOIN agencies a ON u.agency_id = a.id
                 ORDER BY u.createdAt DESC
             ''')
             users_list = []
@@ -188,6 +188,55 @@ def assign_user_agency():
                 agency_code = agency_row['agency_code']
                 cursor.execute('UPDATE users SET agency_id = ?, agencyId = ? WHERE uid = ?', (target_agency_id, agency_code, target_user_id))
             
+            conn.commit()
+
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@users_bp.route('/api/admin/assign-user-to-agency', methods=['POST', 'PUT'])
+@login_required
+def assign_user_to_agency():
+    try:
+        current_user_id = session.get('user_id')
+        data = request.get_json() or {}
+        agency_id = data.get('agencyId')
+        user_ids = data.get('userIds', [])
+
+        if not agency_id:
+            return {"error": "agencyId alanı zorunludur."}, 400
+
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT role FROM users WHERE uid = ?', (current_user_id,))
+            current_user = cursor.fetchone()
+            if not current_user or current_user['role'] != 'admin':
+                return {"error": "Yetkisiz işlem. Yalnızca yöneticiler bu işlemi yapabilir."}, 403
+
+            # Verify agency
+            cursor.execute('SELECT agency_code FROM agencies WHERE id = ?', (agency_id,))
+            agency_row = cursor.fetchone()
+            if not agency_row:
+                return {"error": "Acente bulunamadı."}, 404
+            
+            agency_code = agency_row['agency_code']
+
+            # 1. Set agency_id/agencyId to NULL for users who were in this agency but are NOT in the user_ids list
+            if user_ids:
+                placeholders = ', '.join(['?' for _ in user_ids])
+                cursor.execute(f'''
+                    UPDATE users 
+                    SET agency_id = NULL, agencyId = NULL 
+                    WHERE agency_id = ? AND uid NOT IN ({placeholders})
+                ''', [agency_id] + user_ids)
+            else:
+                cursor.execute('UPDATE users SET agency_id = NULL, agencyId = NULL WHERE agency_id = ?', (agency_id,))
+
+            # 2. Assign checked users to this agency
+            for uid in user_ids:
+                cursor.execute('UPDATE users SET agency_id = ?, agencyId = ? WHERE uid = ?', (agency_id, agency_code, uid))
+
             conn.commit()
 
         return {"success": True}

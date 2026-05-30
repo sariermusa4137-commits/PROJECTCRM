@@ -17,7 +17,7 @@ export async function updateAgenciesTable(container) {
         if (agencies.length === 0) {
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                         Kayıtlı acente bulunamadı.
                     </td>
                 </tr>
@@ -46,7 +46,7 @@ export async function updateAgenciesTable(container) {
                     <td>
                         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 4px 10px; border-radius: var(--border-radius-sm);">
                             <code style="font-family: monospace; font-size: 13px; font-weight: 700; color: var(--primary-color); letter-spacing: 0.5px;">${agency.agency_code}</code>
-                            <button class="btn-copy-code" data-code="${agency.agency_code}" style="background: none; border: none; padding: 0; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; hover: { color: var(--text-primary) }">
+                            <button class="btn-copy-code" data-code="${agency.agency_code}" style="background: none; border: none; padding: 0; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; transition: color var(--transition-fast);">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                             </button>
                         </div>
@@ -62,6 +62,11 @@ export async function updateAgenciesTable(container) {
                         </span>
                     </td>
                     <td style="font-size: 13px; color: var(--text-secondary);">${dateStr}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-manage-agents" data-id="${agency.id}" data-name="${agency.name}" data-code="${agency.agency_code}" style="font-size: 11px; padding: 6px 12px; font-weight: 600;">
+                            Danışmanları Yönet
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
@@ -78,12 +83,109 @@ export async function updateAgenciesTable(container) {
             });
         });
 
+        // Attach event listeners for Danışmanları Yönet button
+        const manageBtns = container.querySelectorAll('.btn-manage-agents');
+        manageBtns.forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const agencyId = parseInt(btn.getAttribute('data-id'));
+                const agencyName = btn.getAttribute('data-name');
+                
+                try {
+                    showToast("Kullanıcı listesi yükleniyor...", "info");
+                    const usersRes = await apiFetch('/api/users');
+                    if (!usersRes.ok) {
+                        throw new Error("Kullanıcı listesi yüklenemedi.");
+                    }
+                    const users = await usersRes.json();
+                    
+                    // Filter out admins (only display advisors/assistants) if preferred,
+                    // but displaying all users is fine.
+                    const userChecklistHtml = users.map(user => {
+                        const isChecked = user.agency_id === agencyId;
+                        const userOffice = user.agencyName ? `🏢 ${user.agencyName}` : 'Bireysel';
+                        
+                        return `
+                            <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); cursor: pointer; transition: all var(--transition-fast); margin-bottom: 4px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" class="user-assign-checkbox" data-uid="${user.uid}" ${isChecked ? 'checked' : ''} style="accent-color: var(--primary-color); width: 16px; height: 16px; cursor: pointer;">
+                                    <span style="font-size: 13px; color: var(--text-primary); font-weight: 500;">
+                                        ${user.displayName || (user.firstName + ' ' + user.lastName)} (${user.role === 'admin' ? 'Admin' : user.role === 'assistant' ? 'Asistan' : 'Danışman'})
+                                    </span>
+                                </div>
+                                <span style="font-size: 11px; color: ${isChecked ? '#2dd4bf' : 'var(--text-muted)'}; font-weight: 600;">
+                                    ${isChecked ? 'Bu Acentede' : userOffice}
+                                </span>
+                            </label>
+                        `;
+                    }).join('');
+                    
+                    const modalContent = `
+                        <div style="display: flex; flex-direction: column; gap: 16px; max-height: 450px; overflow-y: auto; padding-right: 4px;">
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 8px 0; line-height: 1.5;">
+                                Bu acenteye atamak istediğiniz danışmanları işaretleyin. İşareti kaldırılan kullanıcılar acenteden çıkarılarak <strong>Bireysel</strong> alana taşınacaktır.
+                            </p>
+                            <div style="display: flex; flex-direction: column; gap: 4px;" id="assign-users-list-container">
+                                ${userChecklistHtml}
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                                <button type="button" class="btn btn-secondary" id="btn-close-assign-modal" style="font-size: 13px; padding: 10px 18px;">İptal</button>
+                                <button type="button" class="btn btn-primary" id="btn-save-assign" style="font-size: 13px; padding: 10px 18px; font-weight: 600;">Değişiklikleri Kaydet</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    openModal(`Danışman Yönetimi: ${agencyName}`, modalContent);
+                    
+                    const btnClose = document.getElementById('btn-close-assign-modal');
+                    if (btnClose) {
+                        btnClose.addEventListener('click', closeModal);
+                    }
+                    
+                    const btnSave = document.getElementById('btn-save-assign');
+                    if (btnSave) {
+                        btnSave.addEventListener('click', async () => {
+                            try {
+                                btnSave.disabled = true;
+                                btnSave.textContent = "Kaydediliyor...";
+                                
+                                const checkedBoxes = document.querySelectorAll('.user-assign-checkbox:checked');
+                                const userIds = Array.from(checkedBoxes).map(cb => cb.getAttribute('data-uid'));
+                                
+                                const assignRes = await apiFetch('/api/admin/assign-user-to-agency', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ agencyId, userIds })
+                                });
+                                
+                                if (!assignRes.ok) {
+                                    const err = await assignRes.json();
+                                    throw new Error(err.error || "Danışmanlar atanamadı.");
+                                }
+                                
+                                showToast("Danışman atamaları başarıyla güncellendi.", "success");
+                                closeModal();
+                                await updateAgenciesTable(container);
+                            } catch (error) {
+                                console.error(error);
+                                showToast(error.message, "error");
+                                btnSave.disabled = false;
+                                btnSave.textContent = "Değişiklikleri Kaydet";
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast(err.message, "error");
+                }
+            });
+        });
+
     } catch (err) {
         console.error(err);
         showToast("Acenteler yüklenirken hata oluştu.", "error");
         tableBody.innerHTML = `
             <tr>
-                <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                     Yükleme başarısız.
                 </td>
             </tr>
@@ -114,11 +216,12 @@ export async function renderAgenciesView(container) {
                             <th>Üye Sayısı</th>
                             <th>Aktif Portföy</th>
                             <th>Kuruluş Tarihi</th>
+                            <th>İşlemler</th>
                         </tr>
                     </thead>
                     <tbody id="agencies-table-body">
                         <tr>
-                            <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                                 Yükleniyor...
                             </td>
                         </tr>
@@ -162,7 +265,6 @@ export async function renderAgenciesView(container) {
 
                     try {
                         showToast("Acente oluşturuluyor...", "info");
-                        const activeUser = JSON.parse(localStorage.getItem("projectcrm_user_id")) || "";
                         const res = await apiFetch('/api/agency/create', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
