@@ -10,6 +10,7 @@ from auth_middleware import login_required
 users_bp = Blueprint('users', __name__)
 
 
+@users_bp.route('/api/admin/users', methods=['GET'])
 @users_bp.route('/api/users', methods=['GET'])
 @login_required
 def get_users():
@@ -19,7 +20,7 @@ def get_users():
             cursor.execute('''
                 SELECT u.uid, u.displayName, u.email, u.photoURL, u.agencyId, u.agency_id, u.createdAt,
                        u.firstName, u.lastName, u.phone, u.profile_image, u.role,
-                       a.createdById AS agencyOwnerId, a.name AS agencyName
+                       a.created_by AS agencyOwnerId, a.name AS agencyName
                 FROM users u
                 LEFT JOIN agencies a ON u.agency_id = a.id
                 ORDER BY u.createdAt DESC
@@ -31,6 +32,11 @@ def get_users():
                     item['role'] = 'agent'
                 item['isAgencyOwner'] = (item.get('uid') == item.get('agencyOwnerId'))
                 item.pop('agencyOwnerId', None)
+                
+                # Safe fallback defaults
+                item['agencyName'] = item.get('agencyName') or "Acentesi Yok / Atanmamış"
+                item['agency_name'] = item['agencyName']
+                
                 users_list.append(item)
 
         return jsonify(users_list)

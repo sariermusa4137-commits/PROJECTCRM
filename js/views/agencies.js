@@ -63,7 +63,7 @@ export async function updateAgenciesTable(container) {
                     </td>
                     <td style="font-size: 13px; color: var(--text-secondary);">${dateStr}</td>
                     <td>
-                        <button class="btn btn-secondary btn-manage-agents" data-id="${agency.id}" data-name="${agency.name}" data-code="${agency.agency_code}" style="font-size: 11px; padding: 6px 12px; font-weight: 600;">
+                        <button class="btn btn-secondary btn-manage-agents" data-agency-id="${agency.id}" data-name="${agency.name}" data-code="${agency.agency_code}" style="font-size: 11px; padding: 6px 12px; font-weight: 600;">
                             Danışmanları Yönet
                         </button>
                     </td>
@@ -87,12 +87,15 @@ export async function updateAgenciesTable(container) {
         const manageBtns = container.querySelectorAll('.btn-manage-agents');
         manageBtns.forEach(btn => {
             btn.addEventListener('click', async (e) => {
-                const agencyId = parseInt(btn.getAttribute('data-id'));
+                const agencyId = parseInt(btn.getAttribute('data-agency-id'));
                 const agencyName = btn.getAttribute('data-name');
                 
                 try {
                     showToast("Kullanıcı listesi yükleniyor...", "info");
-                    const usersRes = await apiFetch('/api/users');
+                    let usersRes = await apiFetch('/api/admin/users');
+                    if (!usersRes.ok) {
+                        usersRes = await apiFetch('/api/users');
+                    }
                     if (!usersRes.ok) {
                         throw new Error("Kullanıcı listesi yüklenemedi.");
                     }
@@ -101,15 +104,19 @@ export async function updateAgenciesTable(container) {
                     // Filter out admins (only display advisors/assistants) if preferred,
                     // but displaying all users is fine.
                     const userChecklistHtml = users.map(user => {
-                        const isChecked = user.agency_id === agencyId;
-                        const userOffice = user.agencyName ? `🏢 ${user.agencyName}` : 'Bireysel';
+                        const isChecked = String(user.agency_id) === String(agencyId);
+                        const userOffice = (user.agency_id && user.agencyName && user.agencyName !== "Acentesi Yok / Atanmamış") 
+                            ? `🏢 ${user.agencyName}` 
+                            : 'Bireysel';
+                        const dispName = user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || 'İsimsiz Kullanıcı';
+                        const roleText = user.role === 'admin' ? 'Admin' : user.role === 'assistant' ? 'Asistan' : 'Danışman';
                         
                         return `
                             <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); cursor: pointer; transition: all var(--transition-fast); margin-bottom: 4px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <input type="checkbox" class="user-assign-checkbox" data-uid="${user.uid}" ${isChecked ? 'checked' : ''} style="accent-color: var(--primary-color); width: 16px; height: 16px; cursor: pointer;">
                                     <span style="font-size: 13px; color: var(--text-primary); font-weight: 500;">
-                                        ${user.displayName || (user.firstName + ' ' + user.lastName)} (${user.role === 'admin' ? 'Admin' : user.role === 'assistant' ? 'Asistan' : 'Danışman'})
+                                        ${dispName} (${roleText})
                                     </span>
                                 </div>
                                 <span style="font-size: 11px; color: ${isChecked ? '#2dd4bf' : 'var(--text-muted)'}; font-weight: 600;">

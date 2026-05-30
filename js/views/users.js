@@ -23,7 +23,10 @@ export async function updateUsersTable(container) {
             }
         }
 
-        const res = await apiFetch('/api/users');
+        let res = await apiFetch('/api/admin/users');
+        if (!res.ok) {
+            res = await apiFetch('/api/users');
+        }
         if (!res.ok) {
             throw new Error("Kullanıcı listesi alınamadı.");
         }
@@ -47,7 +50,7 @@ export async function updateUsersTable(container) {
                 month: 'long',
                 day: 'numeric'
             }) : '-';
-            const office = user.agencyName || 'Bireysel';
+            const office = user.agency_name || user.agencyName || "Acentesi Yok / Atanmamış";
             
             // Format role text and badge
             const isUserAdmin = user.role === 'admin';
@@ -84,13 +87,15 @@ export async function updateUsersTable(container) {
                 `;
             }
 
+            const dispName = user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || 'İsimsiz Kullanıcı';
+
             return `
                 <tr>
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <img src="${avatar}" alt="Avatar" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color);">
                             <div>
-                                <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${user.displayName || (user.firstName + ' ' + user.lastName)}</div>
+                                <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${dispName}</div>
                                 <div style="font-size: 11px; color: var(--text-muted);">${user.phone || 'Telefon belirtilmemiş'}</div>
                             </div>
                         </div>
