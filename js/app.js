@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Setup static global event handlers
         setupGlobalEvents();
         
+        // Start live dashboard clock
+        startDashboardClock();
+        
         // Run initial state check and routing
         handleStateChange();
         handleRouting();
@@ -333,4 +336,25 @@ function handleStateChange() {
             }
         }
     }
+}
+
+// Dynamically updates the dashboard clock on topbar
+function startDashboardClock() {
+    const clockEl = document.getElementById('dashboard-clock');
+    if (!clockEl) return;
+    
+    function updateClock() {
+        const now = new Date();
+        const day = now.getDate();
+        const month = now.toLocaleDateString('tr-TR', { month: 'long' });
+        const year = now.getFullYear();
+        const weekday = now.toLocaleDateString('tr-TR', { weekday: 'long' });
+        const timeStr = now.toLocaleTimeString('tr-TR', { hour12: false });
+        
+        // Output format: "30 Mayıs 2026, Cumartesi | 14:41:00"
+        clockEl.textContent = `${day} ${month} ${year}, ${weekday} | ${timeStr}`;
+    }
+    
+    updateClock();
+    setInterval(updateClock, 1000);
 }

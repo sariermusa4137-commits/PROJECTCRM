@@ -327,6 +327,28 @@ h1, h2, h3, h4, h5, h6 {
     gap: 16px;
 }
 
+.dashboard-clock {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: var(--border-radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.2px;
+    transition: all var(--transition-fast);
+}
+
+.dashboard-clock:hover {
+    color: var(--text-primary);
+    border-color: rgba(99, 102, 241, 0.4);
+    background: rgba(99, 102, 241, 0.05);
+}
+
 .demo-indicator {
     display: flex;
     align-items: center;
