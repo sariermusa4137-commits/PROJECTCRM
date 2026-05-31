@@ -598,3 +598,50 @@ def generate_location_ai_summary(location_id):
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"AI Analiz üretilirken hata oluştu: {str(e)}"}), 500
+
+
+@data_bp.route('/api/portfolios/shared', methods=['GET'])
+@login_required
+def get_shared_portfolios():
+    try:
+        with db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT p.*,
+                       u.displayName, u.firstName, u.lastName, u.phone AS agent_phone, u.email AS agent_email,
+                       a.name AS agency_name
+                FROM portfolios p
+                LEFT JOIN users u ON p.createdById = u.uid
+                LEFT JOIN agencies a ON u.agency_id = a.id
+                WHERE (p.status = 'aktif' OR p.status IS NULL OR p.status = '')
+                ORDER BY p.createdAt DESC
+            ''')
+            
+            shared_list = []
+            for r in cursor.fetchall():
+                item = dict(r)
+                # Formulate agent_name
+                displayName = item.get('displayName')
+                firstName = item.get('firstName')
+                lastName = item.get('lastName')
+                
+                agent_name = displayName
+                if not agent_name:
+                    names = [firstName, lastName]
+                    agent_name = " ".join([n for n in names if n])
+                if not agent_name:
+                    agent_name = item.get('createdByName') or "İsimsiz Danışman"
+                
+                item['agent_name'] = agent_name
+                
+                # Formulate agency_name
+                item['agency_name'] = item.get('agency_name') or "Bireysel / Acentesiz"
+                
+                # Serialize portfolio fields
+                item = _serialize_record('portfolios', item)
+                
+                shared_list.append(item)
+                
+        return jsonify(shared_list)
+    except Exception as e:
+        return {"error": str(e)}, 500

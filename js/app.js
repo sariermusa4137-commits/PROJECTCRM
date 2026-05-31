@@ -4,6 +4,7 @@ import { state, initStore, subscribe, logout, isAdmin } from './store.js';
 import { renderAuthView } from './views/auth.js';
 import { renderDashboardView } from './views/dashboard.js';
 import { renderPortfolioView } from './views/portfolio.js';
+import { renderSharedPortfolioView } from './views/shared_portfolio.js';
 import { renderCustomersView } from './views/customers.js';
 import { renderMeetingsView } from './views/meetings.js';
 import { renderLocationsView } from './views/locations.js';
@@ -174,6 +175,7 @@ function handleRouting() {
             auth: "Giriş Paneli",
             dashboard: "Dashboard",
             portfolio: "Portföy Havuzu",
+            "shared-portfolio": "Ortak Portföy Havuzu",
             customers: "Müşteri Rehberi",
             meetings: "Görüşmeler & Süreçler",
             locations: "Bölge Analizleri",
@@ -220,6 +222,9 @@ function renderActiveView(viewName) {
             break;
         case "portfolio":
             renderPortfolioView(appView);
+            break;
+        case "shared-portfolio":
+            renderSharedPortfolioView(appView);
             break;
         case "customers":
             renderCustomersView(appView);
@@ -329,7 +334,7 @@ function handleStateChange() {
         // we can safely update lists on the active view, UNLESS user is currently typing in an input.
         if (isAuthenticated && currentView !== "auth") {
             if (!isUserTyping()) {
-                const realTimeViews = ["dashboard", "portfolio", "customers", "meetings", "reminders", "deals"];
+                const realTimeViews = ["dashboard", "portfolio", "shared-portfolio", "customers", "meetings", "reminders", "deals"];
                 if (realTimeViews.includes(currentView)) {
                     renderActiveView(currentView);
                 }
