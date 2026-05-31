@@ -334,7 +334,7 @@ function handleStateChange() {
         // we can safely update lists on the active view, UNLESS user is currently typing in an input.
         if (isAuthenticated && currentView !== "auth") {
             if (!isUserTyping()) {
-                const realTimeViews = ["dashboard", "portfolio", "shared-portfolio", "customers", "meetings", "reminders", "deals"];
+                const realTimeViews = ["dashboard", "portfolio", "customers", "meetings", "reminders", "deals"];
                 if (realTimeViews.includes(currentView)) {
                     renderActiveView(currentView);
                 }

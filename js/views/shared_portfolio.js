@@ -51,8 +51,10 @@ function renderFilteredTable(container, list) {
             currency: 'TRY',
             maximumFractionDigits: 0
         });
-        const typeLabel = (item.type || '').toLowerCase() === 'satilik' ? 'Satılık' : 'Kiralık';
-        const typeBadgeStyle = (item.type || '').toLowerCase() === 'satilik'
+        const typeLower = (item.type || '').toLowerCase();
+        const isSatilik = typeLower.includes('sat') || typeLower.includes('satilik') || typeLower.includes('satılık');
+        const typeLabel = isSatilik ? 'Satılık' : 'Kiralık';
+        const typeBadgeStyle = isSatilik
             ? 'background: rgba(99, 102, 241, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);'
             : 'background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);';
         
@@ -120,7 +122,9 @@ function openSharedDetailModal(item) {
         currency: 'TRY',
         maximumFractionDigits: 0
     });
-    const typeLabel = (item.type || '').toLowerCase() === 'satilik' ? 'Satılık' : 'Kiralık';
+    const typeLower = (item.type || '').toLowerCase();
+    const isSatilik = typeLower.includes('sat') || typeLower.includes('satilik') || typeLower.includes('satılık');
+    const typeLabel = isSatilik ? 'Satılık' : 'Kiralık';
     const image = item.imageUrl || "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&auto=format&fit=crop&q=60";
     
     const phone = item.agent_phone || "Belirtilmemiş";
@@ -277,7 +281,11 @@ export async function renderSharedPortfolioView(container) {
             
             const matchesSearch = titleMatch || districtMatch || agentMatch || agencyMatch;
             
-            const matchesType = !type || (item.type || '').toLowerCase() === type;
+            const typeLower = (item.type || '').toLowerCase();
+            const isSatilik = typeLower.includes('sat') || typeLower.includes('satilik') || typeLower.includes('satılık');
+            const matchesType = !type || 
+                (type === 'satilik' && isSatilik) ||
+                (type === 'kiralik' && !isSatilik);
             
             const matchesRegion = !region || (item.district || item.bolge || '').toLowerCase().includes(region);
             
